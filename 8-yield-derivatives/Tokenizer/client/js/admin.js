@@ -191,7 +191,7 @@ function generateManifestConfig(method, inputValue1, inputValue2, inputValue3, i
         CALL_METHOD
           Address("${accountAddress}")
           "create_proof_of_amount"    
-          Address("${staff_badge}")
+          Address("${admin_badge}")
           Decimal("1");  
         CALL_METHOD
           Address("${componentAddress}")

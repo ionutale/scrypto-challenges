@@ -51,14 +51,14 @@ mod tokenizer {
             unregister => PUBLIC;
             supply => PUBLIC;
             takes_back => PUBLIC;
-            set_reward => restrict_to: [admin, OWNER];
+            set_reward => restrict_to: [staff, admin, OWNER];
             set_extra_reward => restrict_to: [admin, OWNER];
             set_reward_type => restrict_to: [admin, OWNER];
             extend_lending_pool => restrict_to: [admin, OWNER];
             fund_main_pool => restrict_to: [admin, OWNER];
             config => restrict_to: [staff, admin, OWNER];
             add_token => restrict_to: [admin, OWNER];
-            mint_staff_badge => restrict_to: [admin, OWNER];
+            mint_staff_badge => restrict_to: [staff, admin, OWNER];
             tokenize_yield  => PUBLIC;
             redeem => PUBLIC;
             redeem_from_pt => PUBLIC;
