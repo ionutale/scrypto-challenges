@@ -25,6 +25,7 @@ pub struct UserMultiPosition {
 // to contain data about account's tokenized liquidity 
 #[derive(Copy, Clone, ScryptoSbor, NonFungibleData)]
 pub struct YieldTokenData {
+    extra_reward: Decimal,
     underlying_amount: Decimal,
     pub interest_totals: Decimal,
     pub yield_claimed: Decimal,
@@ -32,11 +33,18 @@ pub struct YieldTokenData {
     principal_returned: bool,
 }
 
+
+#[derive(NonFungibleData, ScryptoSbor)]
+struct StaffBadge {
+    username: String
+}
+
 #[blueprint]
 mod tokenizer {
     enable_method_auth! {
         roles {
             admin => updatable_by: [OWNER];
+            staff => updatable_by: [admin, OWNER];
         },
         methods {
             register => PUBLIC;
@@ -44,11 +52,13 @@ mod tokenizer {
             supply => PUBLIC;
             takes_back => PUBLIC;
             set_reward => restrict_to: [admin, OWNER];
+            set_extra_reward => restrict_to: [admin, OWNER];
             set_reward_type => restrict_to: [admin, OWNER];
             extend_lending_pool => restrict_to: [admin, OWNER];
             fund_main_pool => restrict_to: [admin, OWNER];
-            config => restrict_to: [admin, OWNER];
+            config => restrict_to: [staff, admin, OWNER];
             add_token => restrict_to: [admin, OWNER];
+            mint_staff_badge => restrict_to: [admin, OWNER];
             tokenize_yield  => PUBLIC;
             redeem => PUBLIC;
             redeem_from_pt => PUBLIC;
@@ -67,8 +77,9 @@ mod tokenizer {
         interest_for_suppliers: AvlTree<Decimal, Decimal>,
         min_loan_limit: Decimal,
         max_loan_limit: Decimal,
+        staff: AvlTree<u16, NonFungibleLocalId>,
         pt_resource_manager: ResourceManager,
-        yt_resource_manager: ResourceManager
+        staff_badge_resource_manager: ResourceManager
         ,resource_a: ResourceAddress
         ,resource_b: ResourceAddress
     }
@@ -87,9 +98,11 @@ mod tokenizer {
             collected.insert(resource_a, FungibleVault::new(resource_a));
             collected.insert(resource_b, FungibleVault::new(resource_b));
             
-            //data struct for holding interest levels for loan/borrow
+            //data struct for holding interest levels for loan
             let mut lend_tree: AvlTree<Decimal, Decimal> = AvlTree::new();
             lend_tree.insert(Decimal::from(Runtime::current_epoch().number()), reward);
+            //staff
+            let staff: AvlTree<u16, NonFungibleLocalId> = AvlTree::new();
 
             let (address_reservation, component_address) =
                 Runtime::allocate_component_address(Tokenizer::blueprint_id());
@@ -191,32 +204,29 @@ mod tokenizer {
                 .create_with_no_initial_supply();
 
             // Create a resourceManager to manage Yield NonFungibleToken
-            let yt_rm: ResourceManager = 
-                ResourceBuilder::new_ruid_non_fungible::<YieldTokenData>(OwnerRole::Updatable(rule!(
+            let staff_resource_manager: ResourceManager = 
+                ResourceBuilder::new_ruid_non_fungible::<StaffBadge>(OwnerRole::Updatable(rule!(
                     require(owner_badge.resource_address())
                         || require(admin_badge.resource_address())
                 )))
-                .metadata(metadata! {
-                    init {
-                        "name" => "Yield Receipt", locked;
-                        "symbol" => "YT", locked;
-                        "description" => "An NFT containing the Yield Value", locked;
-                        "yield_tokenizer_component" => GlobalAddress::from(component_address), locked;
-                    }
+                .metadata(metadata!(init{
+                    "name" => "Tokenizer Staff_badge", locked;
+                    "symbol" => "Tokenizer Staff", locked;
+                    "description" => "A badge to be used for some administrative function", locked;
+                }))
+                .mint_roles(mint_roles! (
+                         minter => rule!(require(global_caller(component_address)));
+                         minter_updater => OWNER;
+                ))
+                .burn_roles(burn_roles! (
+                    burner => rule!(require(admin_badge.resource_address()));
+                    burner_updater => OWNER;
+                ))
+                .recall_roles(recall_roles! {
+                    recaller => rule!(require(admin_badge.resource_address()));
+                    recaller_updater => OWNER;
                 })
-                .mint_roles(mint_roles! {
-                    minter => rule!(require(global_caller(component_address)));
-                    minter_updater => rule!(deny_all);
-                })
-                .burn_roles(burn_roles! {
-                    burner => rule!(allow_all);
-                    burner_updater => rule!(deny_all);
-                })
-                .non_fungible_data_update_roles(non_fungible_data_update_roles! {
-                    non_fungible_data_updater => rule!(require(global_caller(component_address)));
-                    non_fungible_data_updater_updater => rule!(deny_all);
-                })
-                .create_with_no_initial_supply();
+            .create_with_no_initial_supply();            
 
             // populate a Tokenizer struct and instantiate a new component
             let component = 
@@ -231,8 +241,9 @@ mod tokenizer {
                     interest_for_suppliers: lend_tree,
                     min_loan_limit: dec!(1),
                     max_loan_limit: dec!(10001),
+                    staff: staff,
                     pt_resource_manager: pt_rm,
-                    yt_resource_manager: yt_rm,
+                    staff_badge_resource_manager: staff_resource_manager,
                     collected: collected
                     ,resource_a: resource_a
                     ,resource_b: resource_b
@@ -258,11 +269,13 @@ mod tokenizer {
                         takes_back => Xrd(10.into()), updatable;
 
                         set_reward => Free, locked;
+                        set_extra_reward => Free, locked;
                         set_reward_type => Free, locked;
                         extend_lending_pool => Free, locked;
                         fund_main_pool => Free, locked;
                         config => Free, locked;
                         add_token => Free, locked;
+                        mint_staff_badge => Free, locked;
 
                         tokenize_yield => Xrd(10.into()), updatable;
                         redeem => Xrd(10.into()), updatable;
@@ -280,6 +293,7 @@ mod tokenizer {
                 ))//specify what this roles means
                 .roles(roles!(
                     admin => rule!(require(admin_badge.resource_address()));
+                    staff => rule!(require(staff_resource_manager.address()));
                 ))
                 .with_address(address_reservation)
                 .globalize();
@@ -511,10 +525,7 @@ mod tokenizer {
             //calculate interest
             let accumulated_interest = calculate_interest(tokenize_expected_length, extra_interest, zsu_amount);  
             info!("Simple Interest to be paied {} at epoch {} for the tokenized", accumulated_interest, maturity_epoch);
-            //lock the tokens
-            self.tokenizer_vault.put(tkn_token);
             
-
             let non_fung_bucket = userdata_nft.as_non_fungible();
             let nft_local_id: NonFungibleLocalId = non_fung_bucket.non_fungible_local_id();
             let binding = non_fung_bucket.non_fungible::<UserMultiPosition>().data();
@@ -522,21 +533,34 @@ mod tokenizer {
 
             if let Some(mut data) = yield_data.remove(&token_type) {
                 info!("Tokenize tokens of type  {:?}, amount {:?}", token_type, zsu_amount);
-                //updates data on NFT       
-                data.underlying_amount = zsu_amount;
-                data.interest_totals = accumulated_interest;
-                data.yield_claimed = Decimal::ZERO;
-                data.maturity_date = maturity_epoch;
-                data.principal_returned = false;
-                // Insert the modified data back into the hashmap
-                yield_data.insert(token_type.clone(), data);
-                self.nft_manager.update_non_fungible_data(&nft_local_id, "yield_token_data", yield_data);
+                info!("Principal returned = {:?}", data.principal_returned);
+                if data.principal_returned==true {
+                    //lock the tokens
+                    self.tokenizer_vault.put(tkn_token);
 
-                return (pt_bucket, userdata_nft)
+                    //updates data on NFT       
+                    data.extra_reward = self.extra_reward;
+                    data.underlying_amount = zsu_amount;
+                    data.interest_totals = accumulated_interest;
+                    data.yield_claimed = Decimal::ZERO;
+                    data.maturity_date = maturity_epoch;
+                    data.principal_returned = false;
+                    // Insert the modified data back into the hashmap
+                    yield_data.insert(token_type.clone(), data);
+                    self.nft_manager.update_non_fungible_data(&nft_local_id, "yield_token_data", yield_data);
+
+                    return (pt_bucket, userdata_nft)
+                } else {
+                    assert_pair("You already have some tokenized liquidity ".to_string());
+                    return (scrypto::prelude::FungibleBucket(tkn_token), userdata_nft)
+                }
             } else {
                 info!("No Yield Data available");
+                //lock the tokens
+                self.tokenizer_vault.put(tkn_token);                
                 //updates data on NFT
                 let strip = YieldTokenData {
+                    extra_reward: self.extra_reward,
                     underlying_amount: zsu_amount,
                     interest_totals: accumulated_interest,
                     yield_claimed: Decimal::ZERO,
@@ -547,7 +571,6 @@ mod tokenizer {
                 yield_data.insert(token_type.clone(), strip);
                 self.nft_manager.update_non_fungible_data(&nft_local_id, "yield_token_data", yield_data);
                 info!("New Yield Data has been creted in the account NFT");
-
                 return (pt_bucket, userdata_nft)
             }
         }     
@@ -556,42 +579,64 @@ mod tokenizer {
         pub fn redeem(
             &mut self, 
             pt_bucket: Bucket, 
-            yt_bucket: Bucket, 
-            yt_redeem_amount: Decimal,
-        ) -> (Bucket, Option<Bucket>) {
+            userdata_nft: NonFungibleBucket,
+            token_type: ResourceAddress
+        ) -> (Bucket, Option<NonFungibleBucket>) {
             
-            assert_eq!(pt_bucket.amount(), yt_redeem_amount);
+            let pt_redeem_amount = pt_bucket.amount();
             assert_eq!(pt_bucket.resource_address(), self.pt_resource_manager.address());
-            assert_eq!(yt_bucket.resource_address(), self.yt_resource_manager.address());
+            assert_eq!(userdata_nft.resource_address(), self.nft_manager.address());
 
-            let zsu_bucket = self.tokenizer_vault.take(pt_bucket.amount());
+            let non_fung_bucket = userdata_nft.as_non_fungible();
+            let nft_local_id: NonFungibleLocalId = non_fung_bucket.non_fungible_local_id();
+            let binding = non_fung_bucket.non_fungible::<UserMultiPosition>().data();
+            let mut yield_data = binding.yield_token_data;
 
-            // let option_yt_bucket: Option<Bucket> = if data.underlying_amount > yt_redeem_amount {
-            //     data.underlying_amount -= yt_redeem_amount;
-            //     Some(yt_bucket)
-            // } else {
-            //     yt_bucket.burn();
-            //     None
-            // };
+            if let Some(data) = yield_data.remove(&token_type) {
+                info!("Swap tokens of type  {:?}, amount {:?}", token_type, pt_redeem_amount);
 
-            //burn principal token because they have been returned as an equivalent 
-            pt_bucket.burn();
+                assert_eq!(pt_redeem_amount, data.underlying_amount,
+                    "You need to swap all your tokenized value!");
+                // total at maturity * (1/(1+0.08)) -> 10,240 * 0.9259 -> 9,481
+                // maucalay duration = 9,481/10,000 -> 0.948
+                // modified duration = maucalay duration / (1+0.08) -> 0,948 / 1,08 = 0,877
+                let fixed_reward = data.extra_reward/dec!(100);
+                let total_at_maturity =  (data.underlying_amount+data.interest_totals) * (1/(1+fixed_reward));         //data.underlying_amount          
+                info!("total at maturity {:?}", total_at_maturity);
+                let maucalay_duration = total_at_maturity/data.underlying_amount; //data.underlying_amount
+                info!("maucalay duration {:?}", maucalay_duration);
+                let modified_duration = maucalay_duration / (1+fixed_reward);
+                info!("modified duration {:?}", modified_duration);
 
-            // Perform the calculation of the new price after a change in the interest rate
-            // if the YT refers to a 10,000tokens position at a rate of 8% for an expected duration of 3 years
-            // maucalay duration = formula / current bond price
-            // The calculation must be carried out considering that no coupons are paid but only a % at the end
-            // of the operation
+                //differences in % from the time when the tokenize occurred and now
+                //positive value means that % has been lowered -> PT value has risen
+                //negative value means that % has been raised -> PT value has decreased
+                let diff_reward = data.extra_reward - self.extra_reward;
+                info!("tokenized reward {}% actual extra_reward {}% diff_reward {:?}%", data.extra_reward, self.extra_reward, diff_reward);
+
+                // Insert the cleaned data back into the hashmap for the next round of tokenize
+                let yield_token = self.init_yield();
+                yield_data.insert(token_type.clone(), yield_token);
+                self.nft_manager.update_non_fungible_data(&nft_local_id, "yield_token_data", yield_data);
+
+                //burn principal token because they have been returned as an equivalent 
+                pt_bucket.burn();
+                //return back the amount priced at the current value
+                let diff = diff_reward*modified_duration;
+                info!("returned value is higher/lower of about {:?} %", diff);
+                let priced_amount = (data.underlying_amount+data.interest_totals)*(dec!(100)+diff)/dec!(100);
+                //The actualized price of the tokenized supply will be returned
+                info!("tokens returned {:?}", priced_amount);
+                //unlock the tokens                    
+                let zsu_bucket = self.tokenizer_vault.take(priced_amount);
+
+                return (zsu_bucket, Some(userdata_nft))
+            } else {
+                return (pt_bucket, Some(userdata_nft))
+            }
+        } 
+                       
             
-            // total at maturity * (1/(1+0.08)) -> 10,240 * 0.9259 -> 9,481
-            // maucalay duration = 9,481/10,000 -> 0.948
-            // modified duration = maucalay duration / (1+0.08) -> 0,948 / 1,08 = 0,877
-            
-            // Therefore, if interest rates rise 1% overnight, the price of the bond is expected to drop 0,877%
-            // Therefore, if interest rates drops 1% overnight, the price of the bond is expected to rise 0,877%            
-
-            return (zsu_bucket, None)
-        }
 
         /// This is for claiming principal token after maturity, you get back the principal that had been tozeniked
         pub fn redeem_from_pt(
@@ -622,6 +667,7 @@ mod tokenizer {
 
                 //set that the principal has been returned
                 data.principal_returned = true;
+                data.extra_reward = dec!(0);
                 data.underlying_amount = dec!(0);
                 // Insert the modified data back into the hashmap
                 yield_data.insert(token_type.clone(), data);
@@ -687,6 +733,10 @@ mod tokenizer {
             self.interest_for_suppliers.insert(Decimal::from(Runtime::current_epoch().number()), reward);
         }
 
+        pub fn set_extra_reward(&mut self, extra_reward: Decimal) {
+            self.extra_reward = extra_reward;
+        }
+
         //set the reward type, if fixed or timebased
         pub fn set_reward_type(&mut self, reward_type: String) {
             self.reward_type = reward_type
@@ -737,11 +787,12 @@ mod tokenizer {
 
         fn init_yield(&mut self) -> YieldTokenData {
             return YieldTokenData {
+                extra_reward: dec!(0),
                 underlying_amount: dec!(0),
                 interest_totals: dec!(0),
                 yield_claimed: dec!(0),
                 maturity_date: dec!(0),
-                principal_returned: false,
+                principal_returned: true,
             };    
         }
 
@@ -760,6 +811,22 @@ mod tokenizer {
                 amount: amount
             };
         }         
+
+        //mint a staff for a new staff member
+        pub fn mint_staff_badge(&mut self, username: String) -> Bucket {
+            let staff_badge_bucket: Bucket = self
+                .staff_badge_resource_manager
+                .mint_ruid_non_fungible(StaffBadge {
+                    username: username.clone(),
+                });
+
+            let id = staff_badge_bucket.as_non_fungible().non_fungible_local_id();
+            let key = self.staff.get_length().to_u16().unwrap()+1; 
+            info!("Saving staff badge with key : {:?} and id {:?} for the username: {:?}  ",key, id, username);
+            self.staff.insert(key, id);
+
+            staff_badge_bucket
+        }
     
     }
 }

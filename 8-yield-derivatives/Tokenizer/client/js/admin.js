@@ -36,8 +36,7 @@ let admin_badge = import.meta.env.VITE_ADMIN_BADGE
 let owner_badge = import.meta.env.VITE_OWNER_BADGE
 let lnd_resourceAddress = import.meta.env.VITE_USERDATA_NFT_RESOURCE_ADDRESS // NFT  manager
 let lnd_tokenAddress = import.meta.env.VITE_TOKENIZER_TOKEN_ADDRESS // TKN token resource address
-
-let staff_badge = import.meta.env.VITE_STAFF_BADGE_ADDRESS
+let staff_badge = import.meta.env.VITE_YT_RESOURCE_ADDRESS
 
 let xrdAddress = import.meta.env.VITE_XRD //Stokenet XRD resource address
 
@@ -158,7 +157,24 @@ function generateManifest(method, inputValue) {
             "deposit_batch"
             Expression("ENTIRE_WORKTOP");
           `;
-        break;           
+        break;     
+      case 'mint_staff_badge':
+        code = ` 
+          CALL_METHOD
+            Address("${accountAddress}")
+            "create_proof_of_amount"    
+            Address("${admin_badge}")
+            Decimal("1");
+          CALL_METHOD
+            Address("${componentAddress}")
+            "mint_staff_badge"
+            "${inputValue}";
+          CALL_METHOD
+            Address("${accountAddress}")
+            "deposit_batch"
+            Expression("ENTIRE_WORKTOP");
+          `;
+      break;              
     default:
       throw new Error(`Unsupported method: ${method}`);
   }
@@ -228,6 +244,7 @@ createTransactionOnClick('extendLendingPool', 'extendLendingPoolAmount', 'extend
 createTransactionOnClick('setReward', 'reward', 'set_reward');
 createTransactionOnClick('fundMainPool', 'numberOfFundedTokens', 'fund_main_pool');
 createTransactionOnClick('addToken', 'tokenAddress', 'add_token');
+createTransactionOnClick('mintStaffBadge', 'staffUsername', 'mint_staff_badge');
 
 
 createTransactionConfigOnClick('config', 'reward2','interest2','tokenized_epoch_max_lenght','min_loan_limit','max_loan_limit','config');

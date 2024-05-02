@@ -20,12 +20,6 @@
     "dev": "nodemon",
     "build": "rollup -c",
     "esm": "node --experimental-specifier-resolution=node --loader ts-node/esm",
-    "account-address": "npm run esm ./typescript/scripts/account-address.ts",
-    "generate-mnemonic": "npm run esm ./typescript/scripts/generate-mnemonic.ts",
-    "faucet": "npm run esm ./typescript/scripts/faucet.ts",
-    "gw:well-known": "npm run esm ./typescript/scripts/gw/well-known.ts",
-    "gw:tx:lookup": "npm run esm ./typescript/scripts/gw/lookup-tx.ts",
-    "gw:status": "npm run esm ./typescript/scripts/gw/status.ts",
     "tokenizer:deploy-tokenizer": "npm run esm ./typescript/scripts/tokenizer/deploy_tokenizer.ts"
   },
   "license": "SEE LICENSE",

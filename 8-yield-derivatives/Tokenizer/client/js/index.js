@@ -43,6 +43,7 @@ function cleanPreviousErrors() {
   document.getElementById('tokenizeTxResult').textContent = "";
   document.getElementById('redeemTxResult').textContent = "";
   document.getElementById('claimedTxResult').textContent = "";
+  document.getElementById('SwapTxResult').textContent = "";
 }
 
 // ***** Main function *****
@@ -299,7 +300,45 @@ function generateManifest(method, inputValue, inputValue2) {
                   Expression("ENTIRE_WORKTOP")
                   Enum<0u8>()
               ;`;
-            break;                                                               
+            break;       
+          case 'swap':
+            code = `
+            CALL_METHOD
+                Address("${accountAddressFrom}")
+                "withdraw"
+                Address("${lnd_resourceAddress}")
+                Decimal("1")
+            ;
+            TAKE_FROM_WORKTOP
+                Address("${lnd_resourceAddress}")
+                Decimal("1")
+                Bucket("bucket2")
+            ;
+            CALL_METHOD
+                Address("${accountAddressFrom}")
+                "withdraw"
+                Address("${pt_Address}")
+                Decimal("${inputValue}")
+            ;
+            TAKE_FROM_WORKTOP
+                Address("${pt_Address}")
+                Decimal("${inputValue}")
+                Bucket("bucket1")
+            ;            
+            CALL_METHOD
+                Address("${componentAddress}")
+                "redeem"
+                Bucket("bucket1")
+                Bucket("bucket2")
+                Address("${xrdAddress}")
+            ;
+            CALL_METHOD
+                Address("${accountAddressFrom}")
+                "try_deposit_batch_or_refund"
+                Expression("ENTIRE_WORKTOP")
+                Enum<0u8>()
+            ;`;
+          break;                                                                       
     // Add more cases as needed
     default:
       throw new Error(`Unsupported method: ${method}`);
@@ -320,6 +359,10 @@ createTransactionOnClick('takes_back', 'numberOfLndTokens', 'accountAddress', 't
 createTransactionOnClick('tokenize', 'numberOfTokenizedZero', 'expectedTokenizeLength','tokenize', 'tokenizeTxResult');
 createTransactionOnClick('redeem', 'numberOfRedeemedXrdTokens', 'accountAddress', 'redeem', 'redeemTxResult');
 createTransactionOnClick('claim', 'numberOfClaimedXrdTokens', 'accountAddress', 'claim', 'claimedTxResult');
+
+createTransactionOnClick('swap', 'numberOfSwapXrdTokens', 'accountAddress', 'swap', 'SwapTxResult');
+
+accountAddressForSwap
 
 
 function extractErrorMessage(inputString) {

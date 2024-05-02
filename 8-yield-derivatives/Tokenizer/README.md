@@ -34,6 +34,34 @@ And this opens up the possibility of carrying out buying and selling operations 
 
 ![Tokenize](tokenize.png)  
 
+# Tokenizer Implementation
+
+This blueprint can handle different multiple tokens, there are two that need to be defined at the beginning, and later the administrator can add new address resources.
+
+This tokens are managed through a data structure like this 'collected: HashMap<ResourceAddress, FungibleVault>'.
+
+Each account that provides liquidity is rewarded with a calculated at the moment the liquidity is withdrawn but an important detail is that the rewards are variable over time, 
+this means that it was necessary to memorize the changes in rewards over the epochs and that this has been done through a AVL-Tree data structure so that interest calculation can be done efficiently.
+
+The data structure is defined as here 'interest_for_suppliers: AvlTree<Decimal, Decimal>'
+
+Every time the reward changes it is memorized in which epoch this has occurred.
+
+Each time an account withdraws the provided liquidity the calculation is performed using all the intervals within which the liquidity was provided
+
+This means that the provision of liquidity is subject to a variable interest over time but what you can do is lock in the interest for a duration of time through the 'tokenize'.
+
+After this operation the account can wait for the end of the locking period, otherwise you can execute a swap which will be rewarded with a higher or lower price than the current interest rate.
+
+This swap can be performed both on this platform and also on other platforms, because both the fungible token and the non-fungible token can be withdrawed by the account.
+
+Every account that will interact with this dApp will receive a NFT containing both the liquidity data and the tokenized data.
+
+The data structure is defined as here
+
+    'liquidity_position: HashMap<ResourceAddress, LiquidityData>'
+    
+    'yield_token_data: HashMap<ResourceAddress, YieldTokenData>'
 
 # Interacting with our Tokenizer Locally
 
@@ -54,56 +82,74 @@ As the holder of the admin,owner you can run `resim run rtm/extend_lending_pool.
 As the holder of the admin,owner you can run `resim run rtm/add_token.rtm` to add a new token to the dApp.
 `resim call-method ${component} add_token resource_address --manifest rtm/add_token.rtm`
 
-# Testing
+## Staff
+
+As a staff member you can config the dApp, changing the reward for suppliers, the min and max limit and so on.
+
+Staff member can be assigned by an administator a recallable staff badge to execute functions over the dApp.
+
+# Building & Testing
+
+## Package building
+
+You can run `scrypto build` from the `scrypto` directory for building the packages for deploy
 
 ## Quick test
 
 From the directory `scrypto` you can run:
-    - ./tokenizer.sh for testing some of the main function
+
+    - ./tokenizer.sh for testing some of the main function, but mainly the part of tokenizing
+
+    - ./supply.sh for testing some of the main function, but mainly the part of supply
+
+    - ./swap.sh for testing some of the main function, but mainly the part of swapping before maturity
+
+    This contains an example of the result of two swap operation:
+        The first ended in a gain because interest rates dropped, the second ended in a loss because interest rose
 
 ## Unit test
 
 You can run `scrypto test` from the `scrypto` directory for testing the main functions
-
-# Package building
-
-You can run `scrypto build` from the `scrypto` directory for building the packages for deploy
 
 # Let's have a look at the dApp 
 
 Some shortcut are available for testing, deploying and managing the dApp
 
 You can run the following to deploy on Stokenet:
+
      - `npm install` to install all the packages
+
      - `npm run` to look for all the available command
+
      - `scrypto build` to build the WASM
+
      - Fill your seed phrase in the `.env` file in the main directory in key `MNEMONIC`
+
      - `npm run tokenizer:deploy-tokenizer` to deploy the package to stokenet (a new file `entities.properties` will be written with the new component and resource addresses created)
 
 You can then run the frontend application:
      - move to the `client` directory
+
      - `npm install` to install all the packages
+
      - fill the variables from the file `entities.properties` to the file `env.staging`
+     
      - `npm run` to look for all the available command
+
      - `npm run dev` to run the application and then browse to `localhost:5173`
 
 You can also admin the dApp
+
     - point your browser to `localhost:5173/admin.html` 
+
     - config the dApp with your Owner or Admin Badge
 
-# TODO & Useful commands
+# Online demo dApp 
 
-//to update the package without resetting resim 
+You can also try the deployed dApp here https://zerocollateral.eu/
 
-resim publish . --package-address $package
 
-//Cast Decimal to u64
-
-let dec = dec!("10");
-
-let num: u64 = dec.try_into().unwrap();
-
-# To change the ENV for the frontend dApp
+## To change the ENV for the frontend dApp
 
 You can also try the dApp using the component and resource addresses created by resim.
 To do that you have to fill those values in the file `env.staging` and change the environment as described below
@@ -123,3 +169,7 @@ local will resolve to env.local
     define: {
       'process.env.NODE_ENV': JSON.stringify('staging')
     }
+
+# TODO
+
+You can also try the deployed dApp here https://zerocollateral.eu/
