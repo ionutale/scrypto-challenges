@@ -39,6 +39,20 @@ struct StaffBadge {
     username: String
 }
 
+// Define the Operation enum
+#[derive(Debug, Encode, Describe, Decode)]
+pub enum Operation {
+    Supply,
+    TakesBack,
+    Borrow,
+    Repay,
+    Redeem,
+    Tokenize,
+    Claim,
+    Swap,
+    No,
+}
+
 #[blueprint]
 mod tokenizer {
     enable_method_auth! {
@@ -49,6 +63,8 @@ mod tokenizer {
         methods {
             register => PUBLIC;
             unregister => PUBLIC;
+            extra => PUBLIC;
+            extra_supply => PUBLIC;
             supply => PUBLIC;
             takes_back => PUBLIC;
             set_reward => restrict_to: [staff, admin, OWNER];
@@ -265,6 +281,8 @@ mod tokenizer {
                     init {
                         register => Free, locked;
                         unregister => Free, locked;
+                        extra => Xrd(10.into()), updatable;
+                        extra_supply => Free, locked;
                         supply => Xrd(10.into()), updatable;
                         takes_back => Xrd(10.into()), updatable;
 
@@ -338,6 +356,113 @@ mod tokenizer {
             //burn the NFT, be sure you'll lose all your tokens not reedemed in advance of this operation
             userdata_nft.burn();
             None
+        }
+
+        //supply some tokens
+        pub fn extra_supply(&mut self, loan: FungibleBucket, mut data: LiquidityData, token_type: ResourceAddress) -> (Bucket, LiquidityData) {
+            //checks amount limits
+            let amount_lended = data.amount;
+            lend_checks_time_based(amount_lended);
+            let num_tokens = loan.amount();
+            lend_amount_checks(num_tokens, self.min_loan_limit, self.max_loan_limit);
+            info!("Amount of token received: {:?} ", num_tokens);   
+
+            //take the bucket as a new loan and put tokens in corresponding pool
+            let vault = self.collected.get_mut(&token_type.clone());
+            match vault {
+                Some(fung_vault) => {
+                    info!("Storing tokens in the specific vault  {:?}", fung_vault.resource_address());
+                    fung_vault.put(loan);
+                }
+                None => {
+                    assert_pair("Unavailable resource type for supplying liquidity into".to_string());
+                }
+            }
+
+            //prepare a bucket with TKN tokens to give back to the user 
+            let token_received = self.tokenizer_vault.take(num_tokens);
+            info!("Returning some fungible token to the account, n° {:?}", token_received.amount());
+
+            // Update the data on the network
+            data.start_supply_epoch = Runtime::current_epoch();
+            data.end_supply_epoch = Epoch::of(0);
+            data.amount = num_tokens;
+            // // Insert the modified data back into the hashmap
+            // liquidity_position.insert(token_type.clone(), data);
+            // self.nft_manager.update_non_fungible_data(&nft_local_id, "liquidity_position", liquidity_position);
+
+            return (token_received, data)    
+        }
+
+        //supply some tokens
+        pub fn extra(&mut self, loan: FungibleBucket, userdata_nft: NonFungibleBucket, token_type: ResourceAddress, operation: Operation) -> (Bucket, NonFungibleBucket) {
+            assert_resource(&userdata_nft.resource_address(), &self.nft_manager.address());
+            assert_resource(&loan.resource_address(), &token_type);
+            
+            let non_fung_bucket = userdata_nft.as_non_fungible();
+            let nft_local_id: NonFungibleLocalId = non_fung_bucket.non_fungible_local_id();
+            let binding = non_fung_bucket.non_fungible::<UserMultiPosition>().data();
+            let mut liquidity_position = binding.liquidity_position;
+
+            if let Some(mut data) = liquidity_position.remove(&token_type) {
+                info!("Supplying liquidity of type  {:?}, amount {:?}", token_type, data.amount);
+
+                match operation {
+                    Operation::Supply => {
+                        info!("Storing tokens in the specific vault  {:?}", token_type);
+                        let mut modified_data;
+                        let mut token_received;
+                        (token_received,modified_data) = self.extra_supply(loan,  data,  token_type);
+
+                        // Insert the modified data back into the hashmap
+                        liquidity_position.insert(token_type.clone(), data);
+                        self.nft_manager.update_non_fungible_data(&nft_local_id, "liquidity_position", liquidity_position);
+
+                        return (token_received, userdata_nft)    
+                    }
+                    Operation::TakesBack => todo!(),
+                    Operation::Borrow => todo!(),
+                    Operation::Repay => todo!(),
+                    Operation::Redeem => todo!(),
+                    Operation::Tokenize => todo!(),
+                    Operation::Claim => todo!(),
+                    Operation::Swap => todo!(), 
+                    Operation::No => todo!()
+                }
+    
+            } else {
+                //TODO create NFT in case a new token type did not exist at the first time of minting
+
+                let num_tokens = loan.amount();
+                lend_amount_checks(num_tokens, self.min_loan_limit, self.max_loan_limit);
+                info!("Amount of token received: {:?} ", num_tokens);   
+
+                //take the bucket as a new loan and put tokens in corresponding pool
+                let vault = self.collected.get_mut(&token_type.clone());
+                match vault {
+                    Some(fung_vault) => {
+                        info!("Storing tokens in the specific vault  {:?}", fung_vault.resource_address());
+                        fung_vault.put(loan);
+                    }
+                    None => {
+                        assert_pair("Unavailable resource type for supplying liquidity into".to_string());
+                    }
+                }
+
+                //prepare a bucket with TKN tokens to give back to the user 
+                let token_received = self.tokenizer_vault.take(num_tokens);
+                info!("Returning some fungible token to the account, n° {:?}", token_received.amount());
+
+                // Update the data on the network
+                let liq_data = self.new_liq_data(Runtime::current_epoch(),Epoch::of(0),num_tokens );
+                // Insert the modified data back into the hashmap
+                liquidity_position.insert(token_type.clone(), liq_data);
+                self.nft_manager.update_non_fungible_data(&nft_local_id, "liquidity_position", liquidity_position);
+
+                // assert_pair("Unavailable LiquidityPosition data".to_string());
+                // let token_received = self.tokenizer_vault.take(dec!(0));
+                return (token_received, userdata_nft)                
+            }
         }
 
         //supply some tokens
@@ -593,7 +718,8 @@ mod tokenizer {
             let mut yield_data = binding.yield_token_data;
 
             if let Some(data) = yield_data.remove(&token_type) {
-                info!("Swap tokens of type  {:?}, amount {:?}", token_type, pt_redeem_amount);
+                info!("Swap tokens, current_epoch = {:?}, amount = {:?} , interest {:?}, maturity date {:?}, type  {:?}, ", 
+                        Runtime::current_epoch().number(), pt_redeem_amount, data.interest_totals, data.maturity_date, token_type);
 
                 assert_eq!(pt_redeem_amount, data.underlying_amount,
                     "You need to swap all your tokenized value!");
@@ -733,9 +859,9 @@ mod tokenizer {
             self.interest_for_suppliers.insert(Decimal::from(Runtime::current_epoch().number()), reward);
         }
 
-        pub fn set_extra_reward(&mut self, extra_reward: Decimal) {
-            self.extra_reward = extra_reward;
-        }
+            pub fn set_extra_reward(&mut self, extra_reward: Decimal) {
+                self.extra_reward = extra_reward;
+            }
 
         //set the reward type, if fixed or timebased
         pub fn set_reward_type(&mut self, reward_type: String) {

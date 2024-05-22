@@ -1,4 +1,4 @@
-use tokenizer::tokenizer::{test_bindings::*};
+use tokenizer::tokenizer::{test_bindings::*, Operation};
 use scrypto::*;
 use scrypto_test::prelude::*;
 use scrypto::prelude::FungibleBucket;
@@ -51,7 +51,7 @@ fn tokenizer_supply_tokenize_swap_success_test() -> Result<(), RuntimeError> {
     println!("Nft: {:?} ", userdata_nft);  
 
     // Act
-    let (liquid_bucket, userdata_nft) = tokenizerdapp.supply(bucket1, userdata_nft, XRD, &mut env)?;
+    let (liquid_bucket, userdata_nft) = tokenizerdapp.extra(bucket1, userdata_nft, XRD, Operation::Supply, &mut env)?;
 
     // Assert
     let amount = liquid_bucket.amount(&mut env)?;
