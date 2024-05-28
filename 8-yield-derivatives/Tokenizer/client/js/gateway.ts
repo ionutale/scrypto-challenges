@@ -16,13 +16,15 @@ if (environment == 'production') {
 }
 gwUrl = import.meta.env.VITE_GATEWAY_URL;
 dashboardUrl = import.meta.env.VITE_DASHBOARD_URL;
+let component = import.meta.env.VITE_COMP_ADDRESS
 console.log("gw url (gateway.js): ", gwUrl)
 console.log("dashboard url (gateway.js): ", dashboardUrl)
-
-let component = import.meta.env.VITE_COMP_ADDRESS
 console.log("component address (gateway.js): ", component)
 
-// Instantiate DappToolkit
+/**
+ * Instantiate Radix Dapp Toolkit (RDT).
+ * 
+ */
 export const rdt = RadixDappToolkit({
   dAppDefinitionAddress: dAppId,
   networkId: networkId,
@@ -35,12 +37,14 @@ export const rdt = RadixDappToolkit({
   }
 });
 
-// manage multi tokens
-export function getXrdAddress(currency) {
+/**
+ * Manage multi tokens by returning the token address based on the currency.
+ */
+export function getTokenAddress(currency) {
     if (currency === 'XRD') {
         return 'resource_tdx_2_1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxtfd2jc';
     } else if (currency === 'USDC') {
-        return 'resource_tdx_2_1th9fqs7mfkrsgyc2344hz9z5n47r79v7wxuwyj9mq64wjv3ym6d578';
+        return 'resource_tdx_2_1t57ejuayfdyrzn6wvzdw0u9lh5ae3u72c4pcxwmvvuf47q6jzk4xv2';
     } else if (currency === 'USDT') {
       return 'resource_tdx_2_1th5z7tgaddluc8xg525rvy6klztvmth2tj4hgjpvd78x0mg5854ccu';
   }
@@ -50,21 +54,21 @@ export function getXrdAddress(currency) {
 
 let accountAddress: string | null;
 
-  // ************ Fetch the user's account address (Page Load) ************
-  rdt.walletApi.setRequestData(DataRequestBuilder.accounts().atLeast(1))
-  
-  // Subscribe to updates to the user's shared wallet data
-  const subscription = rdt.walletApi.walletData$.subscribe((walletData) => {
-    accountAddress = walletData && walletData.accounts && walletData.accounts.length>0 ? walletData.accounts[0].address : null
-    console.log("accountAddress : ", accountAddress)
-    if (accountAddress!=null) {
-      
-      const element = document?.getElementById('accountAddress') as HTMLInputElement | null;
-      if (element) {
-          element.value = accountAddress ?? '';
-      }
+// ************ Fetch the user's account address (Page Load) ************
+rdt.walletApi.setRequestData(DataRequestBuilder.accounts().atLeast(1))
 
-      // Store the accountAddress in localStorage
-      localStorage.setItem('accountAddress', accountAddress);
+// Subscribe to updates to the user's shared wallet data
+const subscription = rdt.walletApi.walletData$.subscribe((walletData) => {
+  accountAddress = walletData && walletData.accounts && walletData.accounts.length>0 ? walletData.accounts[0].address : null
+  console.log("accountAddress : ", accountAddress)
+  if (accountAddress!=null) {
+    
+    const element = document?.getElementById('accountAddress') as HTMLInputElement | null;
+    if (element) {
+        element.value = accountAddress ?? '';
     }
-  })
+
+    // Store the accountAddress in localStorage
+    localStorage.setItem('accountAddress', accountAddress);
+  }
+})

@@ -3,32 +3,36 @@
 This application is to participate in the Scrypto Challenge about Yield Derivaties
 
 This dApp is composed by:
+
     - blueprint
     - frontend 
     - transaction manifest files
     - bash script for testing
     - unit test
 
-The blueprint has been already deployed and it is possible to test it right away just by running the included frontend
+This dApp allows users to provide liquidity and it is configured to initially handle only two types of resource addresses, additional token addresses can also be provided subsequently.
 
-This dApp allows users to provide liquidity and it is configured to initially handle only two types of resource addresses, 
-by the way additional token address can be provided.
-
-This dApp defines a variable reward percentage over time and it is the administrator's responsibility to change this percentage.
+This dApp defines a reward percentage for those who provide liquidity which can be varied by the account in possession of the appropriate badge (Admin Badge) and therefore this means that suppliers will be rewarded with a variable percentage.
 
 Each account that provides liquidity will be rewarded according to the percentages in effect during the periods,
-and he will receive his reward when he withdraws his liquidity.
+and it will receive its reward when it withdraws his liquidity.
+
+Each account that provides liquidity will be rewarded according to the percentages in force in the periods in which it has maintained the liquidity deposited, and it will receive the reward when the liquidity will be withdraw.
+
+In the next graph it simply shows how the reward percentage could change over the various epochs and this means that an account that has deposited liquidity from epoch 100 to epoch 500 will be rewarded with a percentage of 5% for epochs 100 to 200, by 6% between 200 and 400 and by 7.5% between 400 and 500, and so on.
+
+Does this remind you of something similar to tradfi?!?
 
 ![Supply](supply.png)  
 
 Each account can also execute a liquidity freeze operation, specifying the duration for which the account wants to block the liquidity.
 
-This liquidity block is called tokenizing, and it guarantees the account an additional reward calculated at the time the block is executed at the  percentage in force at that moment.
-Then, liquidity release can be performed after the specified date 
+This liquidity block is called tokenizing, and it guarantees the account an additional reward calculated at the time the block is executed at the percentage in force at that moment.
+Then, liquidity release can be performed after the specified date.
 
 Before expiry it is possible to trade the principal token on the market because this token will change in value depending on the changes in the percentages in force.
 
-This means that if after the liquidity freeze the interest rate in force increases or decreases then the value of the principality will also change
+This means that if after the liquidity freeze the interest rate in force increases or decreases then the value of the principality will also change.
 
 And this opens up the possibility of carrying out buying and selling operations by those who think how the price will move subsequently
 
@@ -40,8 +44,8 @@ This blueprint can handle different multiple tokens, there are two that need to 
 
 This tokens are managed through a data structure like this 'collected: HashMap<ResourceAddress, FungibleVault>'.
 
-Each account that provides liquidity is rewarded with a calculated at the moment the liquidity is withdrawn but an important detail is that the rewards are variable over time, 
-this means that it was necessary to memorize the changes in rewards over the epochs and that this has been done through a AVL-Tree data structure so that interest calculation can be done efficiently.
+Each account that provides liquidity is rewarded with an amount calculated at the moment the liquidity is withdrawn but an important detail is that the rewards are variable over time, 
+this means that it has been necessary to memorize the interest rates and their changes over the epochs and that this has been done through a AVL-Tree data structure so that interest calculation can be done efficiently.
 
 The data structure is defined as here 'interest_for_suppliers: AvlTree<Decimal, Decimal>'
 
@@ -49,9 +53,9 @@ Every time the reward changes it is memorized in which epoch this has occurred.
 
 Each time an account withdraws the provided liquidity the calculation is performed using all the intervals within which the liquidity was provided
 
-This means that the provision of liquidity is subject to a variable interest over time but what you can do is lock in the interest for a duration of time through the 'tokenize'.
+This means that the provision of liquidity is subject to a variable interest over time but what you can do additionally is to lock the liquidity, and consequently the rewards applied, for a duration of time through the 'tokenize'.
 
-After this operation the account can wait for the end of the locking period, otherwise you can execute a swap which will be rewarded with a higher or lower price than the current interest rate.
+After this operation the account can wait for the end of the locking period, otherwise it can execute a swap which will be rewarded with a higher or lower value based on the current interest rate.
 
 This swap can be performed both on this platform and also on other platforms, because both the fungible token and the non-fungible token can be withdrawed by the account.
 
@@ -63,55 +67,118 @@ The data structure is defined as here
     
     'yield_token_data: HashMap<ResourceAddress, YieldTokenData>'
 
-# Interacting with our Tokenizer Locally
+It worth have a look at this data structures:
+LiquidityData
+    start_supply_epoch: Epoch -> time in which the liquidity was provided
+    end_supply_epoch: Epoch -> period in which the liquidity was withdrawn
+    amount: Decimal -> number of tokens supplied
 
-If you want you can interact with the Tokenizer in your local environment by using resim
+Every time an account withdraws everything then the end_supply_epoch is updated, this is because the provision of additional liquidity is not allowed.
+Each account wishing to add new liquidity must first withdraw everything and then add the full new amount.
 
-You have to use `resim` with some of the most used command like `resim reset`,`resim new-account`,`resim run rtm/instantiate_tokenizer.rtm` and so on
+YieldTokenData 
+    extra_reward: Decimal -> stores the extra-reward fixed at the time of tokenize (useful in case the account decides to perform a swap)
+    underlying_amount: Decimal -> stores the tokenized amount
+    interest_totals: Decimal -> stores the extra reward total amount calculated at the time of the tokenize
+    yield_claimed: Decimal -> stores the amount of yield claimed 
+    maturity_date: Decimal -> stores the epoch when the liquidity block will end 
+    principal_returned: bool -> stores if the principal token has been returned
 
-You can have a look at the bash script scrypto/tokenize.sh that executes all the functions available 
+This is to contain data about account's tokenized liquidity, the 'extra_reward' is important because if and when an accounts wants to trade its tokenized position this is the value which will be compared to the current 'extra_reward', if the current 'extra_reward' has risen the account will receive back a lower value, instead if it has dropped the account will receive back an higher value and this opens a lot of trading opportunities on the market.
 
-## Administration 
+## Owner, Admin and Staff Badges
 
-As the holder of the admin or owner badge you can run `resim run rtm/set_reward.rtm` to set the reward for suppliers.
-`resim call-method ${component} set_reward 10 --manifest rtm/set_reward.rtm`
+The component manages three types of different profiles, Owner, Admin and Staff where each is allowed a different functionality,
 
-As the holder of the admin,owner you can run `resim run rtm/extend_lending_pool.rtm` to extend the pool for suppliers.
-`resim call-method ${component} extend_lending_pool 100 --manifest rtm/extend_lending_pool.rtm`
+For example it is especially useful to note how the Staff Badge works.
 
-As the holder of the admin,owner you can run `resim run rtm/add_token.rtm` to add a new token to the dApp.
-`resim call-method ${component} add_token resource_address --manifest rtm/add_token.rtm`
+An Admin can mint a Staff Badge and send it to one of its staff member directly by using the Radix Wallet and then the staff member can execute what it is allowed.
 
-## Staff
+For example in this component a Staff Member can config the dApp, meaning that it can the reward for suppliers, the min and max supply limit, the max allowed tokenize epoch lenght and so on.
 
-As a staff member you can config the dApp, changing the reward for suppliers, the min and max limit and so on.
+Staff member can also be removed because the badge is recallable!
 
-Staff member can be assigned by an administator a recallable staff badge to execute functions over the dApp.
+# dApp Architecture
 
-# Building & Testing
+The frontend is composed of a web interface built with HTML and JavaScript.
+
+It leverages the Radix Connect Button for user authentication and includes a development and build process managed by Vite. 
+
+The application also includes server-side components built with Express.
+
+This project uses the @radixdlt/connect-button package for user authentication.
+
+## Scripts
+
+The following npm scripts are available:
+
+    - dev: Starts the development server with Vite.
+    - build: Builds the project for production.
+    - preview: Previews the built project.
+
+## Project Structure
+
+The frontend is composed by the following directory structure:
+
+client/
+├── index.html          # Main Page (HTML file)
+├── admin.html          # Admin and Staff Page (HTML file)
+├── css/
+│   └── style.js        # Css file 
+├── js/
+│   ├── gateway.js      # JavaScript file for exporting the RadixDappToolkit and the function that holds the token addresses configured on the dApp
+│   ├── index.js        # Main JavaScript for the Home web page (contains all the tx manifest for interacting with the dApp)
+│   ├── script.js       # JavaScript file for the function that changes the token address used on the web page
+│   └── admin.js        # JavaScript file for the Admin web page (contains all the tx manifest for Admins/Staff for interacting with the dApp)
+├── public/
+│   └── images/         # Backgroung images 
+├── .env                # Environment variables
+├── package.json        # NPM dependencies and scripts
+├── vite.config.js      # Vite configuration file
+└── dist/               # Production-ready files
+
+
+# Documenting & Building & Testing
+
+## Documentation 
+
+You can run `cargo doc` from the `scrypto` directory to create the documentation in the directory `scrypto\target\doc`, and `cargo doc --open` to have it opened it in your web browser
+
+You can run `jsdoc js -d docs` from the `client` directory to create the documentation in the directory `client\docs` about the Javascript functions
 
 ## Package building
 
 You can run `scrypto build` from the `scrypto` directory for building the packages for deploy
 
-## Quick test
-
-From the directory `scrypto` you can run:
-
-    - ./tokenizer.sh for testing some of the main function, but mainly the part of tokenizing
-
-    - ./supply.sh for testing some of the main function, but mainly the part of supply
-
-    - ./swap.sh for testing some of the main function, but mainly the part of swapping before maturity
-
-    This contains an example of the result of two swap operation:
-        The first ended in a gain because interest rates dropped, the second ended in a loss because interest rose
-
 ## Unit test
 
 You can run `scrypto test` from the `scrypto` directory for testing the main functions
 
-# Let's have a look at the dApp 
+
+# Interacting with the Tokenizer
+
+Below we provide a detailed tutorial on how to use the transaction manifest, in the meantime here you can have a look at the bash scripts that have been prepared to simulate some of the possible use-case for this blueprint:
+
+ - scrypto/supply.sh : A simple test that executes the supply, tokenize and withdraw functions
+ - scrypto/tokenize.sh: A simple test that executes the supply, tokenize and redeem/claim after maturity date
+ - scrypto/swap_case1.sh : A simple test that executes the supply, tokenize and swap before maturity date in a scenario where the interest rate has dropped 
+ - scrypto/swap.sh : A complex test that executes the supply, tokenize and swap before maturity date in two scenario, one where interest rates rise and one where interest rates fall
+
+By the way you can also use the Resim tool to play with the local deployed Tokenizer blueprint
+You have to use `resim` with some of the most used command like `resim reset`,`resim new-account` and so on
+
+You can find many examples in the shell scripts just mentioned above
+
+## Interacting with the Tokenizer (Stokenet)
+
+If you want you can interact with the Tokenizer that is already deployed in Stokenet and this means that it is possible to test it right away just by running the included frontend in your local environment.
+
+You have to start the webserver by running 'npm run dev' from the client directory and then point your browser to localhost:5173
+
+Otherwise you can interact with it by using the transaction manifest files.
+
+
+## Deploy your own Tokenizer package (Stokenet) 
 
 Some shortcut are available for testing, deploying and managing the dApp
 
@@ -123,11 +190,14 @@ You can run the following to deploy on Stokenet:
 
      - `scrypto build` to build the WASM
 
-     - Fill your seed phrase in the `.env` file in the main directory in key `MNEMONIC`
+     - Fill your seed phrase in the `.env` file in the main directory in key `MNEMONIC` and fill the derivationIndex in the typescript/config.ts (it should be the position of your account in your wallet)
 
      - `npm run tokenizer:deploy-tokenizer` to deploy the package to stokenet (a new file `entities.properties` will be written with the new component and resource addresses created)
 
-You can then run the frontend application:
+## Interacting with your own Tokenizer component with your local frontend dApp (Stokenet) 
+
+You can then run the frontend application, follow this step:
+
      - move to the `client` directory
 
      - `npm install` to install all the packages
@@ -144,32 +214,124 @@ You can also admin the dApp
 
     - config the dApp with your Owner or Admin Badge
 
-# Online demo dApp 
+## Interacting with your own Tokenizer component by using the Transaction Manifest (Stokenet)     
+
+At this point you should have already deployed the package and you should have the `entities.properties` filled with valid component/resource addresses.
+
+that file has the following content, that is, it contains all the addresses of what it has been created:
+VITE_COMP_ADDRESS=component_tdx_2_1czdgxj72a3ezsfu9fva2x0dtly9l6ltdfz98tcsgle9msjdyztaef0
+VITE_OWNER_BADGE=resource_tdx_2_1t5cjuv5trq784tg3q7dgqnlzguvuf7jxudqw0kpkeg3ul3la43kc3k
+VITE_ADMIN_BADGE=resource_tdx_2_1t4eu9x3sj8hnqp5sjpr5lwq9heclr0pnf6zp964qr0q4y045r56r49
+VITE_TOKENIZER_TOKEN_ADDRESS=resource_tdx_2_1thsdjmsque3ahhj6xjpl2gakxkmm5pmuya80pjd2jlfj4fq24nw6mq
+VITE_USERDATA_NFT_RESOURCE_ADDRESS=resource_tdx_2_1ngdmnv3jk6qlcl3scc4ufr2723vynr2zxr9c9zu3mu09t20sq674kk
+VITE_PT_RESOURCE_ADDRESS=resource_tdx_2_1t5j3f0jck2vefea3ew7ax5p7ev5e6tunv8xx09zjhr594t5z24nq73
+VITE_YT_RESOURCE_ADDRESS=resource_tdx_2_1nff9awqz6p0vwrpsc3yh2me78any7y4ex9732dh508yvzu9mmc7lca
+
+Then, you can execute all the following transaction manifest:
+[text](scrypto/stokenet/add_token.rtm) -> 
+[text](scrypto/stokenet/claim_yield.rtm) 
+[text](scrypto/stokenet/extend_lending_pool.rtm) 
+[text](scrypto/stokenet/fund.rtm) 
+[text](scrypto/stokenet/instantiate_tokenizer.rtm) 
+[text](scrypto/stokenet/redeem_from_pt.rtm) 
+[text](scrypto/stokenet/redeem.rtm) 
+[text](scrypto/stokenet/register.rtm) 
+[text](scrypto/stokenet/set_extra.rtm) 
+[text](scrypto/stokenet/set_reward.rtm) 
+[text](scrypto/stokenet/supply_high.rtm) 
+[text](scrypto/stokenet/takes_back.rtm) 
+[text](scrypto/stokenet/tokenize_yield.rtm) 
+[text](scrypto/stokenet/unregister.rtm)
+
+Here, in detail, we explain getting two of those for example.
+
+Let's say your an administrator and you wanna add a token to the managed ones, so you'd need the [text](scrypto/stokenet/add_token.rtm)
+
+```CALL_METHOD
+    Address("${owner_account}")       -> replaces the ${owner_account} key with the value of the account that did deploy the blueprint
+    "create_proof_of_amount"    
+    Address("${admin_badge}")         -> replaces the ${admin_badge} key with the value of key VITE_ADMIN_BADGE from the `entities.properties`
+    Decimal("1");
+CALL_METHOD
+    Address("${component}")           -> replaces the ${component} key with the value of key VITE_COMP_ADDRESS from the `entities.properties`
+    "add_token"
+    Address("${token}")               -> replaces the ${token} key with the value of the new resource address you want to add
+;
+CALL_METHOD
+    Address("${owner_account}")       -> replaces the ${owner_account} key with the value of the account that did deploy the blueprint
+    "try_deposit_batch_or_refund"
+    Expression("ENTIRE_WORKTOP")
+    Enum<0u8>()
+;```
+
+Or let's say your an user already register and you want to supply some tokens, so you'd need the [text](scrypto/stokenet/supply_high.rtm) 
+
+```CALL_METHOD
+    Address("${account}")                -> replaces the ${account} key with the value of your account
+    "withdraw"
+    Address("${resource_address}")       -> replaces the ${resource_address} key with the resource address you want to supply
+    Decimal("${amount}")                 -> replaces the ${amount} key with the amount you want to supply
+;
+TAKE_FROM_WORKTOP
+    Address("${resource_address}")       -> replaces the ${resource_address} key with the resource address you want to supply
+    Decimal("${amount}")                 -> replaces the ${amount} key with the amount you want to supply
+    Bucket("bucket1")
+;
+CALL_METHOD
+    Address("${account}")                -> replaces the ${account} key with the value of your account
+    "withdraw"
+    Address("${userdata_nft_manager}")   -> replaces the ${userdata_nft_manager} key with the value of key VITE_USERDATA_NFT_RESOURCE_ADDRESS from the `entities.properties`
+    Decimal("1")
+;
+TAKE_FROM_WORKTOP
+    Address("${userdata_nft_manager}")   -> replaces the ${userdata_nft_manager} key with the value of key VITE_USERDATA_NFT_RESOURCE_ADDRESS from the `entities.properties`
+    Decimal("1")
+    Bucket("bucket2")
+;
+CALL_METHOD
+    Address("${component}")              -> replaces the ${component} key with the value of key VITE_COMP_ADDRESS from the `entities.properties`
+    "supply"
+    Bucket("bucket1")
+    Bucket("bucket2")
+    Address("${resource_address}")       -> replaces the ${resource_address} key with the resource address you want to supply
+;
+CALL_METHOD
+    Address("${account}")                -> replaces the ${account} key with the value of your account
+    "try_deposit_batch_or_refund"
+    Expression("ENTIRE_WORKTOP")
+    Enum<0u8>()
+;
+```
+
+
+# Let's finally have a look at the Online demo dApp 
 
 You can also try the deployed dApp here https://zerocollateral.eu/
 
+# License
 
-## To change the ENV for the frontend dApp
+The Radix Scrypto Challenges code is released under Radix Modified MIT License.
 
-You can also try the dApp using the component and resource addresses created by resim.
-To do that you have to fill those values in the file `env.staging` and change the environment as described below
+Copyright 2024 Radix Publishing Ltd
 
-Most important is package.json
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software for non-production informational and educational purposes without
+restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
 
-    "dev": "cross-env NODE_ENV=staging vite",
-    "build": "cross-env NODE_ENV=staging vite build",
+This notice shall be included in all copies or substantial portions of the
+Software.
 
-Then you need to execute 'npm run build' and then 'npm run dev'
+THE SOFTWARE HAS BEEN CREATED AND IS PROVIDED FOR NON-PRODUCTION, INFORMATIONAL
+AND EDUCATIONAL PURPOSES ONLY.
 
-Also you need to change this value in vite.config.js
-
-staging will resolve to env.staging
-local will resolve to env.local
-
-    define: {
-      'process.env.NODE_ENV': JSON.stringify('staging')
-    }
-
-# TODO
-
-You can also try the deployed dApp here https://zerocollateral.eu/
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, ERROR-FREE PERFORMANCE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES,
+COSTS OR OTHER LIABILITY OF ANY NATURE WHATSOEVER, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE, MISUSE OR OTHER DEALINGS IN THE SOFTWARE. THE AUTHORS SHALL
+OWE NO DUTY OF CARE OR FIDUCIARY DUTIES TO USERS OF THE SOFTWARE.

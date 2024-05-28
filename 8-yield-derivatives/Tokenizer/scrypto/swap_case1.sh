@@ -17,7 +17,7 @@ echo "Publishing dapp"
 export dapp_package=$(resim publish . | sed -nr "s/Success! New Package: ([[:alnum:]_]+)/\1/p")
 echo "Package = " $dapp_package
 
-# output=`resim call-function $dapp_package Tokenizer instantiate 5 TKN timebased | awk '/Component: |Resource: / {print $NF}'`
+echo "Instantiate dapp"
 output=`resim call-function $dapp_package Tokenizer instantiate 5 TKN timebased $xrd $demo1 | awk '/Component: |Resource: / {print $NF}'`
 export component=`echo $output | cut -d " " -f1`
 export owner_badge=`echo $output | cut -d " " -f2`
@@ -27,11 +27,13 @@ export userdata_nft_manager=`echo $output | cut -d " " -f5`
 export pt=`echo $output | cut -d " " -f6`
 export yt=`echo $output | cut -d " " -f7`
 
-
+echo "Export component test"
 export component_test=component_sim1cptxxxxxxxxxfaucetxxxxxxxxx000527798379xxxxxxxxxhkrefh
 
+echo "Instantiate output"
 echo 'output = '$output
 
+echo "Component and resource created"
 echo 'component = '$component
 echo 'owner_badge = '$owner_badge
 echo 'admin_badge = '$admin_badge
@@ -52,9 +54,9 @@ echo ' > owner'
 resim show $owner_badge
 echo ' > admin'
 resim show $admin_badge
-echo ' > lnd'
+echo ' > userdata_nft_manager'
 resim show $userdata_nft_manager
-echo ' > zero unit'
+echo ' > tokenizer_token'
 resim show $tokenizer_token
 echo ' > pt'
 resim show $pt
@@ -78,56 +80,47 @@ resim run rtm/extend_lending_pool.rtm
 # echo '>>> Fund Main Vault'
 # resim run rtm/fund.rtm
 
-# echo '>>> Register'
-# resim run rtm/register.rtm
-
 # export account=$(resim new-account | sed -nr "s/Account component address: ([[:alnum:]_]+)/\1/p")
 # echo "Account = " $account
 
 export account=$owner_account
-echo '>>> Register'
+echo '>>> Register an account to the dApp'
 resim run rtm/register.rtm
-
-# echo '>>> Register Again'
-# resim run rtm/register_again.rtm
 
 export resource_address=resource_sim1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxakj8n3
 
-echo '>>> Set Reward 10 at epoch 1'
 export amount_reward='10'
+echo '>>> Set Reward '$amount_reward' at epoch 1'
 resim set-current-epoch 1
 resim run rtm/set_reward.rtm
 
-echo '>>> Set Extra Reward 10 at epoch 1'
 export amount_reward='10'
+echo '>>> Set Extra Reward '$amount_reward' at epoch 1'
 resim run rtm/set_extra.rtm
 
 export amount='10000'
-echo '>>> Lend tokens of type xrd'
+echo '>>> Supply '$amount' tokens of type xrd'
 resim set-current-epoch 1
-#resim call-method ${component} supply $xrd:100
 resim run rtm/supply_high.rtm
+# 10000 xrd have been supplied in
 
-# 10000 xrd supplied in
-
-echo '>>> Tokenize 10000 for 8000 epoch'
 export length='8000'
+echo '>>> Tokenize '$amount' tokens for '$length' epoch'
 resim run rtm/tokenize_yield.rtm
+# 10000 xrd have been tokenized for one month at epoch 1
 
-# 10000 xrd tokenized for one month
-
-
-export amount_reward='9'
-echo '>>> Set Reward ${amount_reward} at epoch 1000'
+# interest rates drops at 5 at epoch 1000
+export amount_reward='5'
+echo '>>> Set Reward '$amount_reward' at epoch 1000'
 resim set-current-epoch 1000
 resim run rtm/set_extra.rtm
 
-# interest rates rises
-
-
+# Trading before the maturity date causes the account to get more tokens than were deposited due to the fact that the interest rate has decreased
+# The opposite happens if instead the interest rates rises
 echo '>>> Redeem'
 export amount='10000'
 resim run rtm/redeem.rtm
+
 
 resim show $account
 

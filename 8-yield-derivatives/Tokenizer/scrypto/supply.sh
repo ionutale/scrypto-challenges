@@ -17,7 +17,7 @@ echo "Publishing dapp"
 export dapp_package=$(resim publish . | sed -nr "s/Success! New Package: ([[:alnum:]_]+)/\1/p")
 echo "Package = " $dapp_package
 
-# output=`resim call-function $dapp_package Tokenizer instantiate 5 TKN timebased | awk '/Component: |Resource: / {print $NF}'`
+echo "Instantiate dapp"
 output=`resim call-function $dapp_package Tokenizer instantiate 5 TKN timebased $xrd $demo1 | awk '/Component: |Resource: / {print $NF}'`
 export component=`echo $output | cut -d " " -f1`
 export owner_badge=`echo $output | cut -d " " -f2`
@@ -27,9 +27,10 @@ export userdata_nft_manager=`echo $output | cut -d " " -f5`
 export pt=`echo $output | cut -d " " -f6`
 export yt=`echo $output | cut -d " " -f7`
 
-
+echo "Export component test"
 export component_test=component_sim1cptxxxxxxxxxfaucetxxxxxxxxx000527798379xxxxxxxxxhkrefh
 
+echo "Instantiate output"
 echo 'output = '$output
 
 echo 'component = '$component
@@ -52,9 +53,9 @@ echo ' > owner'
 resim show $owner_badge
 echo ' > admin'
 resim show $admin_badge
-echo ' > lnd'
+echo ' > userdata_nft_manager'
 resim show $userdata_nft_manager
-echo ' > zero unit'
+echo ' > zero tokenizer_token'
 resim show $tokenizer_token
 echo ' > pt'
 resim show $pt
@@ -65,84 +66,47 @@ echo '>>> Extend Lending Pool High'
 export amount='5000'
 resim run rtm/extend_lending_pool.rtm
 
-# echo '>>> Add Token 1'
-# export token=resource_sim1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxakj8n3
-# resim run rtm/add_token.rtm
-# echo '>>> Add Token 2'
-# export token=$demo1
-# resim run rtm/add_token.rtm
-# echo '>>> Add Token 3'
-# export token=$demo2
-# resim run rtm/add_token.rtm
-
 echo '>>> Fund Main Vault'
 resim run rtm/fund.rtm
-
-# echo '>>> Register'
-# resim run rtm/register.rtm
-
-# export account=$(resim new-account | sed -nr "s/Account component address: ([[:alnum:]_]+)/\1/p")
-# echo "Account = " $account
 
 export account=$owner_account
 echo '>>> Register'
 resim run rtm/register.rtm
 
-# echo '>>> Register Again'
-# resim run rtm/register_again.rtm
 
 export resource_address=resource_sim1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxakj8n3
 
 export amount='4000'
-echo '>>> Lend tokens (amount 4000) of type xrd'
+echo '>>> Supply tokens (amount 4000) of type xrd'
 resim set-current-epoch 1
-#resim call-method ${component} supply $xrd:100
 resim run rtm/supply_high.rtm
-
-
-# 4000 xrd and 4000 demo1 supplied in
-
-# Token USDT=resource_tdx_2_1th5z7tgaddluc8xg525rvy6klztvmth2tj4hgjpvd78x0mg5854ccu
+# 4000 xrd supplied in
 
 echo '>>> Add Token 3'
 export token=$demo2
 resim run rtm/add_token.rtm
 
+echo '>>> Supply 4000 Tokens of a different type'
 export resource_address=$token
-
 export amount='4000'
-echo '>>> Lend tokens (amount 4000) of type USDT'
 resim set-current-epoch 50
-#resim call-method ${component} supply $xrd:100
 resim run rtm/supply_high.rtm
 
 
-
-
+echo '>>> Tokenize 2000 tokens for 4000 epoch , type = '  $token
 export amount='2000'
-echo '>>> Tokenize 1 @100 (amount 2000) for 4000 epoch'
+export length='4000'
 resim set-current-epoch 5000
-#resim call-method ${component} tokenize_yield $xrd:100
 resim run rtm/tokenize_yield.rtm
-
-
-
 
 
 resim set-current-epoch 100
 
+echo '>>> Withdraw (amount 2000) of type ' $token
 export amount='2000'
-echo '>>> Takes Back (amount 2000) of type xrd'
-#resim call-method ${component} supply $xrd:100
 resim run rtm/takes_back.rtm
 
-
-# export amount='2000'
-# echo '>>> Lend tokens (amount 2000) of type xrd'
-# resim set-current-epoch 110
-# #resim call-method ${component} supply $xrd:100
-# resim run rtm/supply_high.rtm
-
+echo '>>> Have a look at the different tokens in the account '
 resim show $account
 
 

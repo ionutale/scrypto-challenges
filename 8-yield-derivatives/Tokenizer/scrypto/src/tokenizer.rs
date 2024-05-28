@@ -1,8 +1,102 @@
+//! # Overview of main functions
+//!
+//! This is the list of all main functions. 
+//!
+//! ## Instantiation
+//!
+//! [instantiate()][tokenizer::Tokenizer::instantiate]
+//! Creates a new Tokenizer instance.
+//!
+//! ## Register
+//!
+//! [register()][tokenizer::Tokenizer::register]
+//! Function for registering an account to the platform
+//! 
+//! ## Unregister
+//!
+//! [unregister()][tokenizer::Tokenizer::unregister]
+//! Function for being removed from the platform 
+//! 
+//! ## Supply
+//!
+//! [supply()][tokenizer::Tokenizer::supply]
+//! Function for supplying fungible tokens to the platform                      
+//! 
+//! ## Takes Back
+//!
+//! [takes_back()][tokenizer::Tokenizer::takes_back]
+//! Function for withdrawing your liquidity from the platform
+//! 
+//! ## Tokenize
+//!
+//! [tokenize_yield()][tokenizer::Tokenizer::tokenize_yield]
+//! Function for tokenizing and block the liquidity already supplied into the platform
+//! 
+//! ## Redeem
+//!
+//! [redeem()][tokenizer::Tokenizer::redeem]
+//! Function for withdrawing the locked liquidity before the maturity dat at the current market value as a function of the interest rate
+//! 
+//! ## Redeem from PT
+//!
+//! [redeem_from_pt()][tokenizer::Tokenizer::redeem_from_pt]
+//! Function for withdrawing the locked liquidity after the maturity date
+//! 
+//! ## Claim Yield
+//!
+//! [claim_yield()][tokenizer::Tokenizer::claim_yield]
+//! Function for withdrawing the accrued interest after the maturity date
+//! 
+//! # Overview of secondary functions
+//!
+//! This is the list of all the functions needed to setup, configure and manage the dApp functionalities
+//! 
+//! ## Set Reward
+//!
+//! [set_reward()][tokenizer::Tokenizer::set_reward]
+//! Function for setting the reward for accounts providing liquidity
+//! 
+//! ## Set Extra Reward
+//!
+//! [set_extra_reward()][tokenizer::Tokenizer::set_extra_reward]
+//! Function for setting the extra reward for accounts blocking their supplied liquidity
+//! 
+//! ## Set Reward Type
+//!
+//! [set_reward_type()][tokenizer::Tokenizer::set_reward_type]
+//! Function for setting the reward type on the supplied liquidity
+//! 
+//! ## Extend Lending Pool
+//!
+//! [extend_lending_pool()][tokenizer::Tokenizer::extend_lending_pool]
+//! Function for extending the maximum amount that a single account can supply in the platform
+//! 
+//! ## Fund Main Pool
+//!
+//! [fund_main_pool()][tokenizer::Tokenizer::fund_main_pool]
+//! Function for funding the main pool at the beginning
+//! 
+//! ## Config
+//!
+//! [config()][tokenizer::Tokenizer::config]
+//! Function for setting and modifying parameters within the life of the smart contract
+//! 
+//! ## Add Token
+//!
+//! [add_token()][tokenizer::Tokenizer::add_token]
+//! Function for adding a new fungible token resource address and allow the contract to handle it 
+//! 
+//! ## Mint Staff Badge
+//!
+//! [mint_staff_badge()][tokenizer::Tokenizer::mint_staff_badge]
+//! Function for minting a new badge for then allowing a staff member to modify the dApp configuration
+//! 
+
 use scrypto::prelude::*;
 use scrypto_avltree::AvlTree;
 use crate::utils::*;
 
-// NFT to manage account position
+/// this is to contain data about an account position over multiple supplied/tokenized liquidity
 #[derive(ScryptoSbor, NonFungibleData)]
 pub struct UserMultiPosition {
     #[mutable]
@@ -11,7 +105,7 @@ pub struct UserMultiPosition {
     yield_token_data: HashMap<ResourceAddress, YieldTokenData>
 }
 
-// to contain data about account's provided liquidity 
+/// this is to contain data about account's provided liquidity 
 #[derive(Copy, Clone, ScryptoSbor, NonFungibleData)]
  pub struct LiquidityData {
     #[mutable]
@@ -22,7 +116,7 @@ pub struct UserMultiPosition {
     amount: Decimal,
 }
 
-// to contain data about account's tokenized liquidity 
+/// this is to contain data about account's tokenized liquidity 
 #[derive(Copy, Clone, ScryptoSbor, NonFungibleData)]
 pub struct YieldTokenData {
     extra_reward: Decimal,
@@ -33,25 +127,12 @@ pub struct YieldTokenData {
     principal_returned: bool,
 }
 
-
+/// this is to contain the username of a Staff Member
 #[derive(NonFungibleData, ScryptoSbor)]
 struct StaffBadge {
     username: String
 }
 
-// Define the Operation enum
-#[derive(Debug, Encode, Describe, Decode)]
-pub enum Operation {
-    Supply,
-    TakesBack,
-    Borrow,
-    Repay,
-    Redeem,
-    Tokenize,
-    Claim,
-    Swap,
-    No,
-}
 
 #[blueprint]
 mod tokenizer {
@@ -63,8 +144,6 @@ mod tokenizer {
         methods {
             register => PUBLIC;
             unregister => PUBLIC;
-            extra => PUBLIC;
-            extra_supply => PUBLIC;
             supply => PUBLIC;
             takes_back => PUBLIC;
             set_reward => restrict_to: [staff, admin, OWNER];
@@ -95,13 +174,40 @@ mod tokenizer {
         max_loan_limit: Decimal,
         staff: AvlTree<u16, NonFungibleLocalId>,
         pt_resource_manager: ResourceManager,
-        staff_badge_resource_manager: ResourceManager
-        ,resource_a: ResourceAddress
-        ,resource_b: ResourceAddress
+        staff_badge_resource_manager: ResourceManager,
+        resource_a: ResourceAddress,
+        resource_b: ResourceAddress
     }
 
     impl Tokenizer {
-        // given a reward level,symbol name, reward_type creates a ready-to-use Tokenizer
+
+        /// Creates a new ready-to-use Tokenizer, returning also an owner and an admin badge
+        ///
+        /// This create also the main container (Hashmap) for managing all the fungible vaults on which the contract is enabled.
+        /// 
+        /// This create also:
+        ///   - A bucket of fungibles limited to 100.000tokens to be returned to accounts that supply liquidity (max size can be increased by the 'extend_pool' function)
+        ///   - A resource manager to mint/update AccountData for suppliers
+        ///   - A resource manager to mint/burn Principal Token for suppliers that decide to tokenize the liquidity provided
+        ///   - A resource manager to mint/burn one or more Staff Badge for those who will be managing this dApp
+        ///   - A balanced binary search tree for storing all the changes in the interest rate that occur during the epoch (period of time needed for the validators to participate in consensus)
+        /// 
+        /// It is important to note that the interest rate may accordingly change every epoch that is around 5 minutes
+        ///
+        /// The Tokenizer can be created by specifying the following parameters: 
+        ///   - a reward level: This is the reward for accounts that will supply liquidity in
+        ///   - a symbol name: This is the token symbol of the fungibles that each account will receive, together with the non fungible token, by supplying liquidity
+        ///   - reward_type: The type of the reward is how the suppliers are rewarded. For this specific blueprint customized for this challenge the reward_type is always based on time.
+        ///   - resource_a: For this specific blueprint customized for this challenge this is the first resource address managed by the blueprint
+        ///   - resource_b: For this specific blueprint customized for this challenge this is the second resource address managed by the blueprint
+        /// 
+        /// Any new token addresses can be added to this blueprint by using the function 'add_token'
+        /// 
+        /// Returns a tuple containing:
+        /// - The component address of the instantiated and globalized Tokenizer
+        /// - An Owner badge 
+        /// - An Admin badge 
+        /// 
         pub fn instantiate(
             reward: Decimal,
             symbol: String,
@@ -110,19 +216,21 @@ mod tokenizer {
             ,resource_b: ResourceAddress
         ) -> (Global<Tokenizer>, FungibleBucket, FungibleBucket) {
 
+            //container for holding a FungibleVault for each FungibleToken managed by the blueprint
             let mut collected: HashMap<ResourceAddress, FungibleVault> = HashMap::new();
             collected.insert(resource_a, FungibleVault::new(resource_a));
             collected.insert(resource_b, FungibleVault::new(resource_b));
             
-            //data struct for holding interest levels for loan
+            //data struct for holding interest rates
             let mut lend_tree: AvlTree<Decimal, Decimal> = AvlTree::new();
             lend_tree.insert(Decimal::from(Runtime::current_epoch().number()), reward);
-            //staff
+            //staff container
             let staff: AvlTree<u16, NonFungibleLocalId> = AvlTree::new();
 
             let (address_reservation, component_address) =
                 Runtime::allocate_component_address(Tokenizer::blueprint_id());
 
+            //owner badge
             let owner_badge = 
                 ResourceBuilder::new_fungible(OwnerRole::None)
                     .metadata(metadata!(init{
@@ -133,6 +241,7 @@ mod tokenizer {
                     .divisibility(DIVISIBILITY_NONE)
                     .mint_initial_supply(1);
 
+            //admin badge
             let admin_badge = 
                 ResourceBuilder::new_fungible(OwnerRole::Updatable(rule!(require(
                     owner_badge.resource_address()
@@ -150,7 +259,7 @@ mod tokenizer {
                 .mint_initial_supply(1);
 
 
-            // create a new resource, with a fixed quantity of 100000
+            // create a new Fungible Bucket, with a fixed quantity of 100000
             let tokenizer_bucket = 
                 ResourceBuilder::new_fungible(OwnerRole::Updatable(rule!(
                     require(owner_badge.resource_address())
@@ -167,7 +276,8 @@ mod tokenizer {
                 ))
                 .mint_initial_supply(100000);
 
-            // Create a resourceManager to manage NFT
+            // Create a resourceManager to manage AccountData NFT
+            // This NFT is also burnable in the scope of this specific blueprint customized for this challenge
             let nft_manager =
                 ResourceBuilder::new_ruid_non_fungible::<UserMultiPosition>(OwnerRole::Updatable(rule!(
                     require(owner_badge.resource_address())
@@ -219,7 +329,7 @@ mod tokenizer {
                 })
                 .create_with_no_initial_supply();
 
-            // Create a resourceManager to manage Yield NonFungibleToken
+            // Create a resourceManager to manage Staff Badges
             let staff_resource_manager: ResourceManager = 
                 ResourceBuilder::new_ruid_non_fungible::<StaffBadge>(OwnerRole::Updatable(rule!(
                     require(owner_badge.resource_address())
@@ -245,6 +355,12 @@ mod tokenizer {
             .create_with_no_initial_supply();            
 
             // populate a Tokenizer struct and instantiate a new component
+            // 
+            // Some parameters are defined herein and can be then modified by the 'config' function
+            //     - extra_reward: It is the extra reward for account that will block liquidity until a maturity date
+            //     - tokenize_epoch_max_lenght: Max length of the tokenize operation (around 1 year)
+            //     - min_loan_limit: Min amount of tokens that an account can supply in
+            //     - max_loan_limit: Max amount of tokens that an account can supply in
             let component = 
                 Self {
                     tokenizer_manager: tokenizer_bucket.resource_manager(),
@@ -270,6 +386,7 @@ mod tokenizer {
                 ))))
                 .enable_component_royalties(component_royalties! {
                     // The roles section is optional, if missing, all roles default to OWNER
+                    // Herein we are specifyng who can set/update/loc/claim the royalties/commissions generated by this smart contract
                     roles {
                         royalty_setter => rule!(allow_all);
                         royalty_setter_updater => OWNER;
@@ -278,11 +395,10 @@ mod tokenizer {
                         royalty_claimer => OWNER;
                         royalty_claimer_updater => rule!(deny_all);
                     },
+                    // Herein we are specifyng which functions generate a commission for the accounts
                     init {
                         register => Free, locked;
                         unregister => Free, locked;
-                        extra => Xrd(10.into()), updatable;
-                        extra_supply => Free, locked;
                         supply => Xrd(10.into()), updatable;
                         takes_back => Xrd(10.into()), updatable;
 
@@ -308,7 +424,8 @@ mod tokenizer {
                         "description" => "Tokenizer SmartContract for lending and tokenizer service", locked;
                         "claimed_websites" =>  ["https://test.Tokenizer.eu"], locked;
                     }
-                ))//specify what this roles means
+                ))
+                //Herein we are specifying what does a role need to present a proof of itself
                 .roles(roles!(
                     admin => rule!(require(admin_badge.resource_address()));
                     staff => rule!(require(staff_resource_manager.address()));
@@ -319,16 +436,46 @@ mod tokenizer {
             return (component, admin_badge, owner_badge);
         }
 
-        //add new token resource address
+        /// Add a new token resource address to those already managed
+        /// For this specific blueprint customized for this challenge a token address cannot be removed
+        /// 
+        /// Arguments:
+        /// - `token`: The resource address of the token you want to add 
+        ///
+        /// Returns 'None':
+        ///
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin only.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/add_token.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/add_token.rtm")]
+        /// ```        
         pub fn add_token(&mut self, token: ResourceAddress)  {
             info!("Adding token type {:?}", token);
             self.collected.insert(token, FungibleVault::new(token));
         }
 
         //register to the platform
+        /// Register the account by minting an NFT for holding the information about the supplied/tokenized liquidity
+        /// 
+        /// Returns:
+        /// - 'userdata_multi_nft': An Nft of type UserMultiPosition containing an HashMap of LiquidityData and an HashMap of YieldTokenData for each Resource Address
+        ///
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/register.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/register.rtm")]
+        /// ```           
         pub fn register(&mut self) -> NonFungibleBucket {
             //mint an NFT for registering loan amount and starting/ending epoch
-            let yield_token = self.init_yield();
+            let yield_token: YieldTokenData = self.init_yield();
             let liq_data = self.init_liq_data();
 
             let mut nft1: HashMap<ResourceAddress, LiquidityData> = HashMap::new();
@@ -350,122 +497,59 @@ mod tokenizer {
         }         
 
 
-
-        //unregister from the platform (useful for stokenet test)
+        /// Unregister the account from the component by burning the information about the supplied/tokenized liquidity
+        /// 
+        /// Be careful ! This has been used for testing this specific blueprint for this challenge
+        /// 
+        /// Arguments:
+        /// - `userdata_nft`: The NFT holding information about the account supplied/tokenized liquidity
+        ///
+        /// Returns 'None':
+        ///
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/unregister.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/unregister.rtm")]
+        /// ```                     
         pub fn unregister(&mut self, userdata_nft: Bucket) -> Option<Bucket> {
             //burn the NFT, be sure you'll lose all your tokens not reedemed in advance of this operation
             userdata_nft.burn();
             None
         }
 
-        //supply some tokens
-        pub fn extra_supply(&mut self, loan: FungibleBucket, mut data: LiquidityData, token_type: ResourceAddress) -> (Bucket, LiquidityData) {
-            //checks amount limits
-            let amount_lended = data.amount;
-            lend_checks_time_based(amount_lended);
-            let num_tokens = loan.amount();
-            lend_amount_checks(num_tokens, self.min_loan_limit, self.max_loan_limit);
-            info!("Amount of token received: {:?} ", num_tokens);   
-
-            //take the bucket as a new loan and put tokens in corresponding pool
-            let vault = self.collected.get_mut(&token_type.clone());
-            match vault {
-                Some(fung_vault) => {
-                    info!("Storing tokens in the specific vault  {:?}", fung_vault.resource_address());
-                    fung_vault.put(loan);
-                }
-                None => {
-                    assert_pair("Unavailable resource type for supplying liquidity into".to_string());
-                }
-            }
-
-            //prepare a bucket with TKN tokens to give back to the user 
-            let token_received = self.tokenizer_vault.take(num_tokens);
-            info!("Returning some fungible token to the account, n° {:?}", token_received.amount());
-
-            // Update the data on the network
-            data.start_supply_epoch = Runtime::current_epoch();
-            data.end_supply_epoch = Epoch::of(0);
-            data.amount = num_tokens;
-            // // Insert the modified data back into the hashmap
-            // liquidity_position.insert(token_type.clone(), data);
-            // self.nft_manager.update_non_fungible_data(&nft_local_id, "liquidity_position", liquidity_position);
-
-            return (token_received, data)    
-        }
-
-        //supply some tokens
-        pub fn extra(&mut self, loan: FungibleBucket, userdata_nft: NonFungibleBucket, token_type: ResourceAddress, operation: Operation) -> (Bucket, NonFungibleBucket) {
-            assert_resource(&userdata_nft.resource_address(), &self.nft_manager.address());
-            assert_resource(&loan.resource_address(), &token_type);
-            
-            let non_fung_bucket = userdata_nft.as_non_fungible();
-            let nft_local_id: NonFungibleLocalId = non_fung_bucket.non_fungible_local_id();
-            let binding = non_fung_bucket.non_fungible::<UserMultiPosition>().data();
-            let mut liquidity_position = binding.liquidity_position;
-
-            if let Some(mut data) = liquidity_position.remove(&token_type) {
-                info!("Supplying liquidity of type  {:?}, amount {:?}", token_type, data.amount);
-
-                match operation {
-                    Operation::Supply => {
-                        info!("Storing tokens in the specific vault  {:?}", token_type);
-                        let mut modified_data;
-                        let mut token_received;
-                        (token_received,modified_data) = self.extra_supply(loan,  data,  token_type);
-
-                        // Insert the modified data back into the hashmap
-                        liquidity_position.insert(token_type.clone(), data);
-                        self.nft_manager.update_non_fungible_data(&nft_local_id, "liquidity_position", liquidity_position);
-
-                        return (token_received, userdata_nft)    
-                    }
-                    Operation::TakesBack => todo!(),
-                    Operation::Borrow => todo!(),
-                    Operation::Repay => todo!(),
-                    Operation::Redeem => todo!(),
-                    Operation::Tokenize => todo!(),
-                    Operation::Claim => todo!(),
-                    Operation::Swap => todo!(), 
-                    Operation::No => todo!()
-                }
-    
-            } else {
-                //TODO create NFT in case a new token type did not exist at the first time of minting
-
-                let num_tokens = loan.amount();
-                lend_amount_checks(num_tokens, self.min_loan_limit, self.max_loan_limit);
-                info!("Amount of token received: {:?} ", num_tokens);   
-
-                //take the bucket as a new loan and put tokens in corresponding pool
-                let vault = self.collected.get_mut(&token_type.clone());
-                match vault {
-                    Some(fung_vault) => {
-                        info!("Storing tokens in the specific vault  {:?}", fung_vault.resource_address());
-                        fung_vault.put(loan);
-                    }
-                    None => {
-                        assert_pair("Unavailable resource type for supplying liquidity into".to_string());
-                    }
-                }
-
-                //prepare a bucket with TKN tokens to give back to the user 
-                let token_received = self.tokenizer_vault.take(num_tokens);
-                info!("Returning some fungible token to the account, n° {:?}", token_received.amount());
-
-                // Update the data on the network
-                let liq_data = self.new_liq_data(Runtime::current_epoch(),Epoch::of(0),num_tokens );
-                // Insert the modified data back into the hashmap
-                liquidity_position.insert(token_type.clone(), liq_data);
-                self.nft_manager.update_non_fungible_data(&nft_local_id, "liquidity_position", liquidity_position);
-
-                // assert_pair("Unavailable LiquidityPosition data".to_string());
-                // let token_received = self.tokenizer_vault.take(dec!(0));
-                return (token_received, userdata_nft)                
-            }
-        }
-
-        //supply some tokens
+        /// Supply some tokens of the specified type
+        /// 
+        /// Arguments:
+        /// - `loan`: A Bucket of tokens that the account want to supply in
+        /// - `userdata_nft`: A NFT for having it updated in its relevant fields
+        /// - `token_type`: The ResourceAddress of the token that the account want to supply in
+        ///
+        /// Returns a tuple with:
+        /// - `token_received`: A bucket with the same number of tokens provided, but of a different type (specifically, we return the tokens managed by the component)
+        /// - `userdata_nft`: The NFT holding information about the account supplied/tokenized liquidity
+        /// 
+        /// Be careful that all the information is contained in the NFT but the tokens are used to make the amount in the wallet more easily visible !
+        /// 
+        /// Panics if:
+        /// - The provided Bucket and the ResourceAddress does not match.
+        /// - The NFT is not of the requested type.
+        /// - A supply operation is already in place (no subsequent supply is managed to make this simple)
+        /// - The number of tokens provided meets the upper or lower limit
+        /// - The tokens provided are not managed yet
+        /// 
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/supply_high.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/supply_high.rtm")]
+        /// ```     
         pub fn supply(&mut self, loan: FungibleBucket, userdata_nft: NonFungibleBucket, token_type: ResourceAddress) -> (Bucket, NonFungibleBucket) {
             assert_resource(&userdata_nft.resource_address(), &self.nft_manager.address());
             assert_resource(&loan.resource_address(), &token_type);
@@ -478,7 +562,7 @@ mod tokenizer {
             if let Some(mut data) = liquidity_position.remove(&token_type) {
                 info!("Supplying liquidity of type  {:?}, amount {:?}", token_type, data.amount);
 
-                //checks amount limits
+                //check amount and time limits
                 let amount_lended = data.amount;
                 lend_checks_time_based(amount_lended);
                 let num_tokens = loan.amount();
@@ -511,8 +595,6 @@ mod tokenizer {
 
                 return (token_received, userdata_nft)        
             } else {
-                //TODO create NFT in case a new token type did not exist at the first time of minting
-
                 let num_tokens = loan.amount();
                 lend_amount_checks(num_tokens, self.min_loan_limit, self.max_loan_limit);
                 info!("Amount of token received: {:?} ", num_tokens);   
@@ -539,13 +621,36 @@ mod tokenizer {
                 liquidity_position.insert(token_type.clone(), liq_data);
                 self.nft_manager.update_non_fungible_data(&nft_local_id, "liquidity_position", liquidity_position);
 
-                // assert_pair("Unavailable LiquidityPosition data".to_string());
-                // let token_received = self.tokenizer_vault.take(dec!(0));
                 return (token_received, userdata_nft)                
             }
         }
 
-        //gives back the original token supplied 
+        /// Returns the requested number of initial tokens provided and additionally returns the reward amount calculated by applying the variable interest that has been in effect in the epochs during which the liquidity provision has remained in the contract
+        /// 
+        /// Arguments:
+        /// - `refund`: A Bucket of tokens that the account want to be returned back
+        /// - `userdata_nft`: A NFT for having it updated in its relevant fields
+        /// - `token_type`: The ResourceAddress of the token that the account want to be returned back
+        ///
+        /// Returns a tuple with:
+        /// - `token_received`: A bucket with the same number of tokens provided (specifically, we return those that were initially provided)
+        /// - `userdata_nft`: The NFT holding information about the account supplied/tokenized liquidity
+        /// 
+        /// 
+        /// Panics if:
+        /// - The provided Bucket and the ResourceAddress does not match.
+        /// - The NFT is not of the requested type.
+        /// - The number of tokens requested back is at least 20% of those provided
+        /// 
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/takes_back.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/takes_back.rtm")]
+        /// ```                
         pub fn takes_back(&mut self, refund: Bucket, userdata_nft: NonFungibleBucket, token_type: ResourceAddress) -> (Bucket, Option<NonFungibleBucket>) {
             assert_resource(&userdata_nft.resource_address(), &self.nft_manager.address());
 
@@ -624,7 +729,36 @@ mod tokenizer {
 
         }
 
-        // tokenize
+        /// Returns the Principal Tokens bucket and also calculates the amount of reward that will be returned at the end of the 
+        /// tokenize operation. 
+        /// The reward will be returned after the maturity date but the data it needs to be calculated are already available 
+        /// so this is why it is calculated in this function.
+        /// 
+        /// Arguments:
+        /// - `tkn_token`: A Bucket of tokens that the account wants to tokenize
+        /// - `tokenize_expected_length`: The duration of the tokenize operation, expressed in Epochs
+        /// - `userdata_nft`: An NFT for having it updated in its relevant fields
+        /// - `token_type`: The ResourceAddress of the token that the account wants to tokenize
+        ///
+        /// Returns a tuple with:
+        /// - `pt_bucket`: A bucket with the same number of the tokenized tokens (specifically, we return the PT token)
+        /// - `userdata_nft`: The NFT holding information about the account supplied/tokenized liquidity
+        /// 
+        /// 
+        /// Panics if:
+        /// - The provided Bucket and the ResourceAddress does not match.
+        /// - The NFT is not of the requested type.
+        /// - The length of the tokenize period is too low/high
+        /// 
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/tokenize_yield.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/tokenize_yield.rtm")]
+        /// ```     
         pub fn tokenize_yield(
             &mut self, 
             tkn_token: Bucket,
@@ -634,7 +768,6 @@ mod tokenizer {
         ) -> (FungibleBucket, NonFungibleBucket) {
             // assert_ne!(self.check_maturity(), true, "The expiry date has passed!");
             assert_eq!(tkn_token.resource_address(), self.tokenizer_manager.address());
-
             epoch_max_length_checks(self.tokenize_epoch_max_lenght,tokenize_expected_length);
             epoch_min(tokenize_expected_length);
 
@@ -700,7 +833,32 @@ mod tokenizer {
             }
         }     
 
-        //swap  todo -> to be implemented
+        /// Returns the required number of initial tokens provided by adding or subtracting the value resulting 
+        /// from the calculation of the lesser or greater value due to the difference between the current interest rate and that of the initial moment
+        /// 
+        /// Arguments:
+        /// - `pt_bucket`: A Bucket of tokens that the account wants to swap
+        /// - `userdata_nft`: A NFT for having it updated in its relevant fields
+        /// - `token_type`: The ResourceAddress of the token that the account wants to swap
+        ///
+        /// Returns a tuple with:
+        /// - `zsu_bucket`: A bucket with the same number of tokens provided (specifically, we return those that can be used to immediately withdraw the principal)
+        /// - `userdata_nft`: The NFT holding information about the account supplied/tokenized liquidity
+        /// 
+        /// 
+        /// Panics if:
+        /// - The provided Bucket and the ResourceAddress does not match.
+        /// - The NFT is not of the requested type.
+        /// 
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/redeem.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/redeem.rtm")]
+        /// ```     
         pub fn redeem(
             &mut self, 
             pt_bucket: Bucket, 
@@ -718,8 +876,7 @@ mod tokenizer {
             let mut yield_data = binding.yield_token_data;
 
             if let Some(data) = yield_data.remove(&token_type) {
-                info!("Swap tokens, current_epoch = {:?}, amount = {:?} , interest {:?}, maturity date {:?}, type  {:?}, ", 
-                        Runtime::current_epoch().number(), pt_redeem_amount, data.interest_totals, data.maturity_date, token_type);
+                info!("Swap tokens of type  {:?}, amount {:?}", token_type, pt_redeem_amount);
 
                 assert_eq!(pt_redeem_amount, data.underlying_amount,
                     "You need to swap all your tokenized value!");
@@ -765,6 +922,33 @@ mod tokenizer {
             
 
         /// This is for claiming principal token after maturity, you get back the principal that had been tozeniked
+        /// 
+        /// Returns the requested number of initial tokens provided (specifically, we return those tokens that can be used to immediately withdraw the principal)
+        /// 
+        /// Arguments:
+        /// - `pt_bucket`: A Bucket of tokens that the account want to be returned back
+        /// - `userdata_nft`: A NFT for having it updated in its relevant fields
+        /// - `token_type`: The ResourceAddress of the token that the account want to be returned back
+        ///
+        /// Returns a tuple with:
+        /// - `token_received`: A bucket with the same number of tokens provided (specifically, we return those that were initially provided)
+        /// - `userdata_nft`: The NFT holding information about the account supplied/tokenized liquidity
+        /// 
+        /// 
+        /// Panics if:
+        /// - The provided Bucket and the ResourceAddress does not match.
+        /// - The maturity date has not been reached
+        /// - The NFT is not of the requested type.
+        /// 
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/redeem_from_pt.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/redeem_from_pt.rtm")]
+        /// ```     
         pub fn redeem_from_pt(
             &mut self,
             pt_bucket: FungibleBucket,
@@ -811,9 +995,33 @@ mod tokenizer {
         }
 
         /// This is for claiming yield after maturity, you get back the interest calculated at the time of tozeniking
+        /// 
+        /// Returns the extra reward amount that has been calculated at the time of the tokenize operation
+        /// 
+        /// Arguments:
+        /// - `userdata_nft`: A NFT for having it updated in its relevant fields
+        /// - `token_type`: The ResourceAddress of the token that the account want to be returned back
+        ///
+        /// Returns a tuple with:
+        /// - `net_returned`: A bucket with the extra reward 
+        /// - `userdata_nft`: The NFT holding information about the account supplied/tokenized liquidity
+        /// 
+        /// 
+        /// Panics if:
+        /// - The maturity date has not been reached
+        /// - The NFT is not of the requested type.
+        /// 
+        /// ---
+        ///
+        /// **Access control:** Can be called by anyone.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/claim_yield.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/claim_yield.rtm")]
+        /// ```     
         pub fn claim_yield(
             &mut self, 
-            // _yt_proof: NonFungibleProof,
             userdata_nft: NonFungibleBucket,
             token_type: ResourceAddress
         ) -> (Bucket, NonFungibleBucket) {
@@ -851,34 +1059,95 @@ mod tokenizer {
                 return (net_returned, userdata_nft)
             }
         }
-
-        //Utility functions
-        // set the reward for suppliers
+        
+        /// Utility function: Set the reward for suppliers
+        /// 
+        /// Arguments:
+        /// - `reward`: The new 'interest rate' for account supplying liquidity
+        /// 
+        /// The new 'interest rate' is stored in the balanced binary search tree for then be used for reward calculations
+        /// 
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin only.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/set_reward.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/set_reward.rtm")]
+        /// ```             
         pub fn set_reward(&mut self, reward: Decimal) {
             self.reward = reward;
             self.interest_for_suppliers.insert(Decimal::from(Runtime::current_epoch().number()), reward);
         }
 
-            pub fn set_extra_reward(&mut self, extra_reward: Decimal) {
-                self.extra_reward = extra_reward;
-            }
+        /// Utility function: Set the extra reward for accounts locking their supplied liquidity
+        /// 
+        /// Arguments:
+        /// - `extra_reward`: The new extra 'interest rate' for accounts that will tokenize their liquidity provided from now on
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin only.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/set_extra.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/set_extra.rtm")]
+        /// ```                     
+        pub fn set_extra_reward(&mut self, extra_reward: Decimal) {
+            self.extra_reward = extra_reward;
+        }
 
-        //set the reward type, if fixed or timebased
+        /// Utility function: Set the reward type, if fixed or timebased
+        /// 
+        /// For this specific blueprint customized for this challenge this function has not be used.
+        /// No Transaction manifest has been provided
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin only.
+        ///                 
         pub fn set_reward_type(&mut self, reward_type: String) {
             self.reward_type = reward_type
         }
 
-        //extend the pool for accept lendings
+        /// Utility function: Increases the level of liquidity that the contract is able to accept
+        /// 
+        /// Arguments:
+        /// - `size_extended`: The number of additional tokens that the contract will accept from now on
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin only.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/extend_lending_pool.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/extend_lending_pool.rtm")]
+        /// ```                   
         pub fn extend_lending_pool(&mut self, size_extended: Decimal) {
             self.tokenizer_vault.put(self.tokenizer_manager.mint(size_extended));
         }
 
-        //for funding the main pool
+        /// Utility function: For funding the main pool
+        /// 
+        /// It is outside the scope of this specific challenge to describe how the liquidity received is used. 
+        /// However for the specific purpose of this challenge this function is provided to allow the contract to 'pay out' rewards to accounts that provide or tokenized their liquidity
+        /// 
+        /// Arguments:
+        /// - `fund`: A Bucket of tokens that the account want to be returned back
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin only.
+        ///
+        /// **Transaction manifest:**
+        /// `rtm/fund.rtm`
+        /// ```text
+        #[doc = include_str!("../rtm/fund.rtm")]
+        /// ```                   
         pub fn fund_main_pool(&mut self, fund: FungibleBucket)  {
             info!("Fund received to fund the main vault: {:?} ", fund.amount());  
             let token_type = fund.resource_address();
 
-            //take the  bucket as a new loan and put tokens in corresponding pool
+            //take the bucket and put tokens in corresponding pool
             let vault = self.collected.get_mut(&token_type.clone());
             match vault {
                 Some(fung_vault) => {
@@ -892,8 +1161,17 @@ mod tokenizer {
             }
         }
 
-
-        //for admin only
+        /// Utility function: Set parameters 
+        /// 
+        /// Arguments:
+        /// - `reward`: It is the reward for account that supply liquidity in
+        /// - `extra_reward`: It is the extra reward for account that will block liquidity until a maturity date
+        /// - `tokenize_epoch_max_lenght`: Max length of the tokenize operation (around 1 year)
+        /// - `min_loan_limit`: Min amount of tokens that an account can supply in
+        /// - `max_loan_limit`: Max amount of tokens that an account can supply in
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin or the Staff only.            
         pub fn config(&mut self, reward: Decimal, extra_reward: Decimal
                 , tokenize_epoch_max_lenght: Decimal
                 , min_loan_limit: Decimal, max_loan_limit: Decimal ) {                
@@ -911,6 +1189,7 @@ mod tokenizer {
             );                                           
         }      
 
+        /// Internal function: Initialized YieldTokenData Struct
         fn init_yield(&mut self) -> YieldTokenData {
             return YieldTokenData {
                 extra_reward: dec!(0),
@@ -922,6 +1201,7 @@ mod tokenizer {
             };    
         }
 
+        /// Internal function: Initialized LiquidityData Struct (at the time of registering the account)
         fn init_liq_data(&mut self) -> LiquidityData {
             return LiquidityData {
                 start_supply_epoch: Epoch::of(0),
@@ -930,6 +1210,7 @@ mod tokenizer {
             };
         }   
 
+        /// Internal function: Initialized LiquidityData Struct (at the time of the first supply of a new token)
         fn new_liq_data(&mut self,start_supply_epoch: Epoch,end_supply_epoch: Epoch,amount: Decimal) -> LiquidityData {
             return LiquidityData {
                 start_supply_epoch: start_supply_epoch,
@@ -938,7 +1219,14 @@ mod tokenizer {
             };
         }         
 
-        //mint a staff for a new staff member
+        /// Utility function: Mint a staff badge for a new staff member
+        /// 
+        /// Arguments:
+        /// - `username`: Username that will be registered in the NFT
+        /// ---
+        ///
+        /// **Access control:** Can be called by the Owner or the Admin only.
+        ///                    
         pub fn mint_staff_badge(&mut self, username: String) -> Bucket {
             let staff_badge_bucket: Bucket = self
                 .staff_badge_resource_manager
