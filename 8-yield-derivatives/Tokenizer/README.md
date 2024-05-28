@@ -68,20 +68,31 @@ The data structure is defined as here
     'yield_token_data: HashMap<ResourceAddress, YieldTokenData>'
 
 It worth have a look at this data structures:
+
 LiquidityData
+
     start_supply_epoch: Epoch -> time in which the liquidity was provided
+
     end_supply_epoch: Epoch -> period in which the liquidity was withdrawn
+
     amount: Decimal -> number of tokens supplied
 
 Every time an account withdraws everything then the end_supply_epoch is updated, this is because the provision of additional liquidity is not allowed.
 Each account wishing to add new liquidity must first withdraw everything and then add the full new amount.
 
 YieldTokenData 
-    extra_reward: Decimal -> stores the extra-reward fixed at the time of tokenize (useful in case the account decides to perform a swap)
+
+    extra_reward: Decimal -> stores the extra-reward fixed at the time of tokenize (useful in 
+    case the account decides to perform a swap)
+    
     underlying_amount: Decimal -> stores the tokenized amount
+    
     interest_totals: Decimal -> stores the extra reward total amount calculated at the time of the tokenize
+    
     yield_claimed: Decimal -> stores the amount of yield claimed 
+    
     maturity_date: Decimal -> stores the epoch when the liquidity block will end 
+    
     principal_returned: bool -> stores if the principal token has been returned
 
 This is to contain data about account's tokenized liquidity, the 'extra_reward' is important because if and when an accounts wants to trade its tokenized position this is the value which will be compared to the current 'extra_reward', if the current 'extra_reward' has risen the account will receive back a lower value, instead if it has dropped the account will receive back an higher value and this opens a lot of trading opportunities on the market.
@@ -121,20 +132,38 @@ The following npm scripts are available:
 The frontend is composed by the following directory structure:
 
 client/
+
 ├── index.html          # Main Page (HTML file)
+
 ├── admin.html          # Admin and Staff Page (HTML file)
+
 ├── css/
+
 │   └── style.js        # Css file 
+
 ├── js/
-│   ├── gateway.js      # JavaScript file for exporting the RadixDappToolkit and the function that holds the token addresses configured on the dApp
-│   ├── index.js        # Main JavaScript for the Home web page (contains all the tx manifest for interacting with the dApp)
-│   ├── script.js       # JavaScript file for the function that changes the token address used on the web page
+
+│   ├── gateway.js      # JavaScript file for exporting the RadixDappToolkit and the function 
+that holds the token addresses configured on the dApp
+
+│   ├── index.js        # Main JavaScript for the Home web page (contains all the tx manifest 
+for interacting with the dApp)
+
+│   ├── script.js       # JavaScript file for the function that changes the token address used 
+on the web page
+
 │   └── admin.js        # JavaScript file for the Admin web page (contains all the tx manifest for Admins/Staff for interacting with the dApp)
+
 ├── public/
+
 │   └── images/         # Backgroung images 
+
 ├── .env                # Environment variables
+
 ├── package.json        # NPM dependencies and scripts
+
 ├── vite.config.js      # Vite configuration file
+
 └── dist/               # Production-ready files
 
 
@@ -228,24 +257,38 @@ VITE_PT_RESOURCE_ADDRESS=resource_tdx_2_1t5j3f0jck2vefea3ew7ax5p7ev5e6tunv8xx09z
 VITE_YT_RESOURCE_ADDRESS=resource_tdx_2_1nff9awqz6p0vwrpsc3yh2me78any7y4ex9732dh508yvzu9mmc7lca
 
 Then, you can execute all the following transaction manifest:
-[text](scrypto/stokenet/add_token.rtm) -> 
-[text](scrypto/stokenet/claim_yield.rtm) 
-[text](scrypto/stokenet/extend_lending_pool.rtm) 
-[text](scrypto/stokenet/fund.rtm) 
-[text](scrypto/stokenet/instantiate_tokenizer.rtm) 
-[text](scrypto/stokenet/redeem_from_pt.rtm) 
-[text](scrypto/stokenet/redeem.rtm) 
-[text](scrypto/stokenet/register.rtm) 
-[text](scrypto/stokenet/set_extra.rtm) 
-[text](scrypto/stokenet/set_reward.rtm) 
-[text](scrypto/stokenet/supply_high.rtm) 
-[text](scrypto/stokenet/takes_back.rtm) 
-[text](scrypto/stokenet/tokenize_yield.rtm) 
-[text](scrypto/stokenet/unregister.rtm)
+
+[add token](scrypto/stokenet/add_token.rtm) -> add token resource address
+
+[claim yield](scrypto/stokenet/claim_yield.rtm) -> claim yield from the tokenize operation
+
+[extend pool](scrypto/stokenet/extend_lending_pool.rtm) -> extend the pool for increase max amount suppliable
+
+[fund pool](scrypto/stokenet/fund.rtm) -> fund the main pool
+
+[instantiate](scrypto/stokenet/instantiate_tokenizer.rtm) -> instantiate
+
+[redeem from pt](scrypto/stokenet/redeem_from_pt.rtm) -> redeem from principal token
+
+[swap](scrypto/stokenet/redeem.rtm) -> swap principal token and yield
+
+[register](scrypto/stokenet/register.rtm) -> register account
+
+[set extra reward](scrypto/stokenet/set_extra.rtm) -> set 'interest rate' for tokenize
+
+[set extra reward](scrypto/stokenet/set_reward.rtm) -> set 'interest rate' for suppliers
+
+[supply](scrypto/stokenet/supply_high.rtm) -> supply
+
+[withdraw](scrypto/stokenet/takes_back.rtm) -> withdraw
+
+[tokenize](scrypto/stokenet/tokenize_yield.rtm) -> tokenize and get back a principal token and an updated nft
+
+[unregister](scrypto/stokenet/unregister.rtm) -> unregister account
 
 Here, in detail, we explain getting two of those for example.
 
-Let's say your an administrator and you wanna add a token to the managed ones, so you'd need the [text](scrypto/stokenet/add_token.rtm)
+Let's say your an administrator and you wanna add a token to the managed ones, so you'd need the [scrypto/stokenet/add_token.rtm](scrypto/stokenet/add_token.rtm)
 
 ```CALL_METHOD
     Address("${owner_account}")       -> replaces the ${owner_account} key with the value of the account that did deploy the blueprint
@@ -264,7 +307,7 @@ CALL_METHOD
     Enum<0u8>()
 ;```
 
-Or let's say your an user already register and you want to supply some tokens, so you'd need the [text](scrypto/stokenet/supply_high.rtm) 
+Or let's say your an user already register and you want to supply some tokens, so you'd need the [scrypto/stokenet/supply_high.rtm](scrypto/stokenet/supply_high.rtm) 
 
 ```CALL_METHOD
     Address("${account}")                -> replaces the ${account} key with the value of your account
