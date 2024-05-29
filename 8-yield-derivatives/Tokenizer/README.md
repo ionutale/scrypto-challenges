@@ -290,7 +290,8 @@ Here, in detail, we explain getting two of those for example.
 
 Let's say your an administrator and you wanna add a token to the managed ones, so you'd need the [scrypto/stokenet/add_token.rtm](scrypto/stokenet/add_token.rtm)
 
-```CALL_METHOD
+```
+CALL_METHOD
     Address("${owner_account}")       -> replaces the ${owner_account} key with the value of the account that did deploy the blueprint
     "create_proof_of_amount"    
     Address("${admin_badge}")         -> replaces the ${admin_badge} key with the value of key VITE_ADMIN_BADGE from the `entities.properties`
@@ -305,11 +306,13 @@ CALL_METHOD
     "try_deposit_batch_or_refund"
     Expression("ENTIRE_WORKTOP")
     Enum<0u8>()
-;```
+;
+```
 
 Or let's say your an user already register and you want to supply some tokens, so you'd need the [scrypto/stokenet/supply_high.rtm](scrypto/stokenet/supply_high.rtm) 
 
-```CALL_METHOD
+```
+CALL_METHOD
     Address("${account}")                -> replaces the ${account} key with the value of your account
     "withdraw"
     Address("${resource_address}")       -> replaces the ${resource_address} key with the resource address you want to supply
