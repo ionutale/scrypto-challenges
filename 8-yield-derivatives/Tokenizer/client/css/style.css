@@ -1,3 +1,12 @@
+:root {
+  /* CSS HSL */
+  --midnight-green: hsla(193, 100%, 20%, 1);
+  --pacific-cyan: hsla(192, 100%, 41%, 1);
+  --aquamarine: hsla(147, 100%, 81%, 1);
+  --persian-green: hsla(171, 63%, 39%, 1);
+  --light-green: hsla(124, 67%, 69%, 1);
+}
+
 body {
   /* background-image: url("../images/BackgroundGradient.png"); */
   color: #333333;
@@ -42,11 +51,11 @@ main > section {
 
 button {
   padding: 1rem;
-  background-color: #c3c7c8;
+  background-color: var(--persian-green);
   border-radius: 10px;
-  border: 1px solid #000000; 
+  border: 1px solid rgba(237, 231, 225, 0.1);
   font-size: 18px;
-  color: #333333;
+  color: #FFFFFF;
   min-width: 23%;
   transition: all 0.3s ease;
 
@@ -58,7 +67,7 @@ button {
  buttons states
 */
 button:hover {
-  background-color: #333333;
+  background-color: var(--light-green);
   color: #FFFFFF;
 }
 
