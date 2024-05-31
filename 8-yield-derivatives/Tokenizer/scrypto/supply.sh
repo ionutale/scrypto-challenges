@@ -66,6 +66,7 @@ echo '>>> Extend Lending Pool High'
 export amount='5000'
 resim run rtm/extend_lending_pool.rtm
 
+export fund='1000'
 echo '>>> Fund Main Vault'
 resim run rtm/fund.rtm
 

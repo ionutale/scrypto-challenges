@@ -10,62 +10,68 @@ This dApp is composed by:
     - bash script for testing
     - unit test
 
-This dApp allows users to provide liquidity and it is configured to initially handle only two types of resource addresses, additional token addresses can also be provided subsequently.
+
+This dApp allows users to provide liquidity and is initially configured to handle only two types of resource addresses. Additional token addresses can be added later.
 
 This dApp defines a reward percentage for those who provide liquidity which can be varied by the account in possession of the appropriate badge (Admin Badge) and therefore this means that suppliers will be rewarded with a variable percentage.
 
-Each account that provides liquidity will be rewarded according to the percentages in effect during the periods,
-and it will receive its reward when it withdraws his liquidity.
+Liquidity providers are rewarded with a variable percentage, which can be adjusted by an account holding the Admin Badge. 
+This means the reward percentage can vary over time.
 
-Each account that provides liquidity will be rewarded according to the percentages in force in the periods in which it has maintained the liquidity deposited, and it will receive the reward when the liquidity will be withdraw.
+Each account that provides liquidity will be rewarded according to the percentages in effect during the periods in which they maintain their deposited liquidity. 
+Rewards are received upon withdrawal of liquidity.
 
-In the next graph it simply shows how the reward percentage could change over the various epochs and this means that an account that has deposited liquidity from epoch 100 to epoch 500 will be rewarded with a percentage of 5% for epochs 100 to 200, by 6% between 200 and 400 and by 7.5% between 400 and 500, and so on.
+The next graph illustrates how the reward percentage can change over different epochs. For example, an account that deposits liquidity from epoch 100 to epoch 500 will be rewarded with 5% from epochs 100 to 200, 6% from epochs 200 to 400, and 7.5% from epochs 400 to 500, and so on.
 
-Does this remind you of something similar to tradfi?!?
+Does this remind you of something similar in traditional finance (TradFi) ?
 
 ![Supply](supply.png)  
 
-Each account can also execute a liquidity freeze operation, specifying the duration for which the account wants to block the liquidity.
+Each account can execute a liquidity freeze operation, specifying the duration for which they want to block their liquidity.
 
-This liquidity block is called tokenizing, and it guarantees the account an additional reward calculated at the time the block is executed at the percentage in force at that moment.
-Then, liquidity release can be performed after the specified date.
+This liquidity block, called tokenizing, guarantees the account an additional reward calculated at the percentage in force at the time of the block. 
+The Tokenizer will return a Principal Token (fungible) and a Yield Token (non-fungible) that can be released after the specified date or traded independently of each other.
 
-Before expiry it is possible to trade the principal token on the market because this token will change in value depending on the changes in the percentages in force.
 
-This means that if after the liquidity freeze the interest rate in force increases or decreases then the value of the principality will also change.
+Before expiry, the tokenized tokens can be traded on the market, as their value will fluctuate based on changes in the reward percentages in force.
 
-And this opens up the possibility of carrying out buying and selling operations by those who think how the price will move subsequently
+If the interest rate changes after the liquidity freeze, the value of the tokenized tokens will also change. 
+This opens up opportunities for trading by those speculating on future price movements.
 
 ![Tokenize](tokenize.png)  
 
 # Tokenizer Implementation
 
-This blueprint can handle different multiple tokens, there are two that need to be defined at the beginning, and later the administrator can add new address resources.
+This blueprint can handle multiple tokens. Two tokens need to be defined at the beginning, and later the administrator can add new address resources.
 
-This tokens are managed through a data structure like this 'collected: HashMap<ResourceAddress, FungibleVault>'.
+Tokens are managed through a data structure like this:
 
-Each account that provides liquidity is rewarded with an amount calculated at the moment the liquidity is withdrawn but an important detail is that the rewards are variable over time, 
-this means that it has been necessary to memorize the interest rates and their changes over the epochs and that this has been done through a AVL-Tree data structure so that interest calculation can be done efficiently.
+    collected: HashMap<ResourceAddress, FungibleVault>
 
-The data structure is defined as here 'interest_for_suppliers: AvlTree<Decimal, Decimal>'
+Each account that provides liquidity is rewarded with an amount calculated at the moment the liquidity is withdrawn. 
+An important detail is that the rewards are variable over time, which necessitates memorizing interest rates and their changes over epochs. 
+This has been done using an AVL-Tree data structure to ensure efficient interest calculation.
 
-Every time the reward changes it is memorized in which epoch this has occurred.
+The data structure is defined as: 
 
-Each time an account withdraws the provided liquidity the calculation is performed using all the intervals within which the liquidity was provided
+    interest_for_suppliers: AvlTree<Decimal, Decimal>
 
-This means that the provision of liquidity is subject to a variable interest over time but what you can do additionally is to lock the liquidity, and consequently the rewards applied, for a duration of time through the 'tokenize'.
+Every time the reward changes, the epoch in which this occurs is recorded.
 
-After this operation the account can wait for the end of the locking period, otherwise it can execute a swap which will be rewarded with a higher or lower value based on the current interest rate.
+When an account withdraws the provided liquidity, the calculation is performed using all the intervals within which the liquidity was provided. This means that liquidity provision is subject to variable interest over time. 
+Additionally, liquidity can be locked through the 'tokenize' function, and the extra rewards will be applied for the duration of time specified.
 
-This swap can be performed both on this platform and also on other platforms, because both the fungible token and the non-fungible token can be withdrawed by the account.
+After this operation, the account can wait for the end of the locking period or execute a swap, which will be rewarded with a higher or lower value based on the current interest rate.
 
-Every account that will interact with this dApp will receive a NFT containing both the liquidity data and the tokenized data.
+This swap can be performed both on this platform and other platforms, as both the fungible and non-fungible tokens can be withdrawn by the account.
 
-The data structure is defined as here
+Every account interacting with this dApp will receive an NFT containing both liquidity data and tokenized data.
 
-    'liquidity_position: HashMap<ResourceAddress, LiquidityData>'
+The data structure is defined as:
+
+    liquidity_position: HashMap<ResourceAddress, LiquidityData>
     
-    'yield_token_data: HashMap<ResourceAddress, YieldTokenData>'
+    yield_token_data: HashMap<ResourceAddress, YieldTokenData>
 
 It worth have a look at this data structures:
 
@@ -95,17 +101,19 @@ YieldTokenData
     
     principal_returned: bool -> stores if the principal token has been returned
 
-This is to contain data about account's tokenized liquidity, the 'extra_reward' is important because if and when an accounts wants to trade its tokenized position this is the value which will be compared to the current 'extra_reward', if the current 'extra_reward' has risen the account will receive back a lower value, instead if it has dropped the account will receive back an higher value and this opens a lot of trading opportunities on the market.
+This data structure contains information about an account's tokenized liquidity. The 'extra_reward' is crucial because it determines the value of an account's tokenized position when trading.
+
+When an account wants to trade its tokenized position, the 'extra_reward' is compared to the current 'extra_reward'. If the current 'extra_reward' has increased, the account will receive a lower value. Conversely, if it has decreased, the account will receive a higher value. This dynamic opens up numerous trading opportunities on the market.
 
 ## Owner, Admin and Staff Badges
 
-The component manages three types of different profiles, Owner, Admin and Staff where each is allowed a different functionality,
+The component manages three types of profiles: Owner, Admin, and Staff, each with different functionalities.
 
-For example it is especially useful to note how the Staff Badge works.
+The Staff Badge is particularly noteworthy. An Admin can mint a Staff Badge and send it to a staff member using the Radix Wallet. 
+Once received, the staff member can perform their allowed actions.
 
-An Admin can mint a Staff Badge and send it to one of its staff member directly by using the Radix Wallet and then the staff member can execute what it is allowed.
+In this component, a Staff Member can configure the dApp, including setting the reward for suppliers, the minimum and maximum supply limits, the maximum allowed tokenize epoch length, and more.
 
-For example in this component a Staff Member can config the dApp, meaning that it can the reward for suppliers, the min and max supply limit, the max allowed tokenize epoch lenght and so on.
 
 Staff member can also be removed because the badge is recallable!
 
@@ -117,7 +125,8 @@ It leverages the Radix Connect Button for user authentication and includes a dev
 
 The application also includes server-side components built with Express.
 
-This project uses the @radixdlt/connect-button package for user authentication.
+This project uses the `@radixdlt/connect-button` package for user authentication.
+
 
 ## Scripts
 
@@ -177,6 +186,42 @@ You can run `jsdoc js -d docs` from the `client` directory to create the documen
 
 ## Package building
 
+    - dev: Starts the development server with Vite.
+    - build: Builds the project for production.
+    - preview: Previews the built project.
+
+## Project Structure
+
+The frontend is composed by the following directory structure:
+
+    client/
+    ├── index.html          # Main Page (HTML file)
+    ├── admin.html          # Admin and Staff Page (HTML file)
+    ├── css/
+    │   └── style.js        # Css file 
+    ├── js/
+    │   ├── gateway.js      # JavaScript file using the RadixDappToolkit, the function for changing the token addresses and the calls to Radix API Gateway
+    │   ├── index.js        # Main JavaScript for the Home web page (contains all the tx manifest for interacting with the dApp)
+    │   ├── script.js       # JavaScript file for the function that changes the token address used on the web page
+    │   └── admin.js        # JavaScript file for the Admin web page (contains all the tx manifest for Admins/Staff for interacting with the dApp)
+    ├── public/
+    │   └── images/         # Backgroung images 
+    ├── .env                # Environment variables
+    ├── package.json        # NPM dependencies and scripts
+    ├── vite.config.js      # Vite configuration file
+    └── dist/               # Production-ready files
+
+
+# Documenting & Building & Testing
+
+## Documentation 
+
+You can run `cargo doc --no-deps --open --document-private-items` from the `scrypto` directory to create the documentation in the directory `scrypto\target\doc`, and `cargo doc --open` to have it opened it in your web browser
+
+You can run `jsdoc js -d docs` from the `client` directory to create the documentation in the directory `client\docs` about the Javascript functions
+
+## Package building
+
 You can run `scrypto build` from the `scrypto` directory for building the packages for deploy
 
 ## Unit test
@@ -213,78 +258,81 @@ Some shortcut are available for testing, deploying and managing the dApp
 
 You can run the following to deploy on Stokenet:
 
-     - `npm install` to install all the packages
+ - `npm install` to install all the packages
 
-     - `npm run` to look for all the available command
+ - `npm run` to look for all the available command
 
-     - `scrypto build` to build the WASM
+ - `scrypto build` to build the WASM
 
-     - Fill your seed phrase in the `.env` file in the main directory in key `MNEMONIC` and fill the derivationIndex in the typescript/config.ts (it should be the position of your account in your wallet)
+ - Fill your seed phrase in the `.env` file in the main directory in key `MNEMONIC` and fill the derivationIndex in the typescript/config.ts (it should be the position of your account in your wallet)
 
-     - `npm run tokenizer:deploy-tokenizer` to deploy the package to stokenet (a new file `entities.properties` will be written with the new component and resource addresses created)
+ - `npm run tokenizer:deploy-tokenizer` to deploy the package to stokenet (a new file `entities.properties` will be written with the new component and resource addresses created)
+
+ - `node .\replaceValues.js` to have the dapp_definition transaction manifest files ready to be executed on the console (https://stokenet-console.radixdlt.com/transaction-manifest)
 
 ## Interacting with your own Tokenizer component with your local frontend dApp (Stokenet) 
 
 You can then run the frontend application, follow this step:
 
-     - move to the `client` directory
+ - move to the `client` directory
 
-     - `npm install` to install all the packages
+ - `npm install` to install all the packages
 
-     - fill the variables from the file `entities.properties` to the file `env.staging`
+ - fill the variables from the file `entities.properties` to the file `env.staging`
      
-     - `npm run` to look for all the available command
+ - `npm run` to look for all the available command
 
-     - `npm run dev` to run the application and then browse to `localhost:5173`
+ - `npm run dev` to run the application and then browse to `localhost:5173`
 
 You can also admin the dApp
 
-    - point your browser to `localhost:5173/admin.html` 
+ - point your browser to `localhost:5173/admin.html` 
 
-    - config the dApp with your Owner or Admin Badge
+ - config the dApp with your Owner or Admin Badge
 
 ## Interacting with your own Tokenizer component by using the Transaction Manifest (Stokenet)     
 
 At this point you should have already deployed the package and you should have the `entities.properties` filled with valid component/resource addresses.
 
 that file has the following content, that is, it contains all the addresses of what it has been created:
-VITE_COMP_ADDRESS=component_tdx_2_1czdgxj72a3ezsfu9fva2x0dtly9l6ltdfz98tcsgle9msjdyztaef0
-VITE_OWNER_BADGE=resource_tdx_2_1t5cjuv5trq784tg3q7dgqnlzguvuf7jxudqw0kpkeg3ul3la43kc3k
-VITE_ADMIN_BADGE=resource_tdx_2_1t4eu9x3sj8hnqp5sjpr5lwq9heclr0pnf6zp964qr0q4y045r56r49
-VITE_TOKENIZER_TOKEN_ADDRESS=resource_tdx_2_1thsdjmsque3ahhj6xjpl2gakxkmm5pmuya80pjd2jlfj4fq24nw6mq
-VITE_USERDATA_NFT_RESOURCE_ADDRESS=resource_tdx_2_1ngdmnv3jk6qlcl3scc4ufr2723vynr2zxr9c9zu3mu09t20sq674kk
-VITE_PT_RESOURCE_ADDRESS=resource_tdx_2_1t5j3f0jck2vefea3ew7ax5p7ev5e6tunv8xx09zjhr594t5z24nq73
-VITE_YT_RESOURCE_ADDRESS=resource_tdx_2_1nff9awqz6p0vwrpsc3yh2me78any7y4ex9732dh508yvzu9mmc7lca
+
+    VITE_COMP_ADDRESS=component_tdx_2_1czdgxj72a3ezsfu9fva2x0dtly9l6ltdfz98tcsgle9msjdyztaef0
+    VITE_OWNER_BADGE=resource_tdx_2_1t5cjuv5trq784tg3q7dgqnlzguvuf7jxudqw0kpkeg3ul3la43kc3k
+    VITE_ADMIN_BADGE=resource_tdx_2_1t4eu9x3sj8hnqp5sjpr5lwq9heclr0pnf6zp964qr0q4y045r56r49
+    VITE_TOKENIZER_TOKEN_ADDRESS=resource_tdx_2_1thsdjmsque3ahhj6xjpl2gakxkmm5pmuya80pjd2jlfj4fq24nw6mq
+    VITE_USERDATA_NFT_RESOURCE_ADDRESS=resource_tdx_2_1ngdmnv3jk6qlcl3scc4ufr2723vynr2zxr9c9zu3mu09t20sq674kk
+    VITE_PT_RESOURCE_ADDRESS=resource_tdx_2_1t5j3f0jck2vefea3ew7ax5p7ev5e6tunv8xx09zjhr594t5z24nq73
+    VITE_STAFF_BADGE=resource_tdx_2_1nff9awqz6p0vwrpsc3yh2me78any7y4ex9732dh508yvzu9mmc7lca
 
 Then, you can execute all the following transaction manifest:
 
-[add token](scrypto/stokenet/add_token.rtm) -> add token resource address
+- [add token](scrypto/stokenet/add_token.rtm) -> add token resource address
 
-[claim yield](scrypto/stokenet/claim_yield.rtm) -> claim yield from the tokenize operation
+- [claim yield](scrypto/stokenet/claim_yield.rtm) -> claim yield from the tokenize operation
 
-[extend pool](scrypto/stokenet/extend_lending_pool.rtm) -> extend the pool for increase max amount suppliable
+- [extend pool](scrypto/stokenet/extend_lending_pool.rtm) -> extend the pool for increase max amount suppliable
 
-[fund pool](scrypto/stokenet/fund.rtm) -> fund the main pool
+- [fund pool](scrypto/stokenet/fund.rtm) -> fund the main pool
 
-[instantiate](scrypto/stokenet/instantiate_tokenizer.rtm) -> instantiate
+- [instantiate](scrypto/stokenet/instantiate_tokenizer.rtm) -> instantiate
 
-[redeem from pt](scrypto/stokenet/redeem_from_pt.rtm) -> redeem from principal token
+- [redeem from pt](scrypto/stokenet/redeem_from_pt.rtm) -> redeem from principal token
 
-[swap](scrypto/stokenet/redeem.rtm) -> swap principal token and yield
+- [swap](scrypto/stokenet/redeem.rtm) -> swap principal token and yield
 
-[register](scrypto/stokenet/register.rtm) -> register account
+- [register](scrypto/stokenet/register.rtm) -> register account
 
-[set extra reward](scrypto/stokenet/set_extra.rtm) -> set 'interest rate' for tokenize
+- [set extra reward](scrypto/stokenet/set_extra.rtm) -> set 'interest rate' for tokenize
 
-[set extra reward](scrypto/stokenet/set_reward.rtm) -> set 'interest rate' for suppliers
+- [set extra reward](scrypto/stokenet/set_reward.rtm) -> set 'interest rate' for suppliers
 
-[supply](scrypto/stokenet/supply_high.rtm) -> supply
+- [supply](scrypto/stokenet/supply_high.rtm) -> supply
 
-[withdraw](scrypto/stokenet/takes_back.rtm) -> withdraw
+- [withdraw](scrypto/stokenet/takes_back.rtm) -> withdraw
 
-[tokenize](scrypto/stokenet/tokenize_yield.rtm) -> tokenize and get back a principal token and an updated nft
+- [tokenize](scrypto/stokenet/tokenize_yield.rtm) -> tokenize and get back a principal token and an updated nft
 
-[unregister](scrypto/stokenet/unregister.rtm) -> unregister account
+- [unregister](scrypto/stokenet/unregister.rtm) -> unregister account
 
 Here, in detail, we explain getting two of those for example.
 

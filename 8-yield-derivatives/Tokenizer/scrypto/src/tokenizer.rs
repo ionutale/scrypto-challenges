@@ -880,6 +880,10 @@ mod tokenizer {
 
                 assert_eq!(pt_redeem_amount, data.underlying_amount,
                     "You need to swap all your tokenized value!");
+                info!("Swap tokens of type {:?}, amount locked {:?} until {:?}, now is epoch {} ", token_type, pt_redeem_amount, data.maturity_date, Runtime::current_epoch().number());
+                info!("Tokenized amount {:?} and Extra reward at maturity {:?} ", data.underlying_amount, data.interest_totals);
+
+                assert_eq!(pt_redeem_amount, data.underlying_amount, "You need to swap all your tokenized value!");
                 // total at maturity * (1/(1+0.08)) -> 10,240 * 0.9259 -> 9,481
                 // maucalay duration = 9,481/10,000 -> 0.948
                 // modified duration = maucalay duration / (1+0.08) -> 0,948 / 1,08 = 0,877
@@ -896,6 +900,7 @@ mod tokenizer {
                 //negative value means that % has been raised -> PT value has decreased
                 let diff_reward = data.extra_reward - self.extra_reward;
                 info!("tokenized reward {}% actual extra_reward {}% diff_reward {:?}%", data.extra_reward, self.extra_reward, diff_reward);
+                info!("Extra reward at the time of tokenize {}%, actual extra_reward {}%, diff_reward {:?}%", data.extra_reward, self.extra_reward, diff_reward);
 
                 // Insert the cleaned data back into the hashmap for the next round of tokenize
                 let yield_token = self.init_yield();

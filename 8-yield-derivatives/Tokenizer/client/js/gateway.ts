@@ -37,6 +37,9 @@ export const rdt = RadixDappToolkit({
   }
 });
 
+// Global states
+let componentAddress = import.meta.env.VITE_COMP_ADDRESS //Component address on stokenet
+
 /**
  * Manage multi tokens by returning the token address based on the currency.
  */
@@ -71,4 +74,96 @@ const subscription = rdt.walletApi.walletData$.subscribe((walletData) => {
     // Store the accountAddress in localStorage
     localStorage.setItem('accountAddress', accountAddress);
   }
+
+  interface Hashmap {
+    [key: string]: any;
+  }    
+  const hashmap: Hashmap = fetchComponentConfig(componentAddress)  
+  //get config parameter of the component
+  console.log("Hashmap:", hashmap);  
+
 })
+
+
+
+// *********** Fetch Component Config (/state/entity/details) (Gateway) ***********
+interface Hashmap {
+  [key: string]: any;
+}    
+export async function fetchComponentConfig(_componentAddress: any): Promise<Hashmap>  {
+  // Define the data to be sent in the POST request.
+  const requestData = generatePayload("ComponentConfig", "", "Global");
+  const hashmap: Hashmap = {};
+  // Make an HTTP POST request to the gateway
+  fetch(gwUrl+'/state/entity/details', {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json',
+      },
+      body: requestData,
+  })
+  .then(response => response.json()) // Assuming the response is JSON data.
+  .then(data => { 
+    const json = data.items ? data.items[0] : null;
+    
+    const currentEpoch = data.ledger_state.epoch;
+
+    const rewardValue = getReward(json);
+    const extrarewardValue = getExtraReward(json);
+
+    const currentRewardConfig = document.getElementById("currentReward");
+    const currentExtraRewardConfig = document.getElementById("currentExtraReward");
+
+    if (currentRewardConfig) currentRewardConfig.textContent = rewardValue + '%' ?? '';
+    if (currentExtraRewardConfig) currentExtraRewardConfig.textContent = extrarewardValue + '%' ?? '';
+
+  })
+  .catch(error => {
+      console.error('Error fetching data:', error);
+  });
+  return hashmap;
+}
+
+
+
+// ************ Utility Function (Gateway) *****************
+function generatePayload(method: string, _address: string, resource_address: string) {
+  let code;
+  console.log("generatePayload for method:", method);
+  switch (method) {
+    case 'ComponentConfig':
+      console.log("generatePayload for method:", method);
+      code = `{
+        "addresses": [
+          "${componentAddress}"
+        ],
+        "aggregation_level": "Global",
+        "opt_ins": {
+          "ancestor_identities": true,
+          "component_royalty_vault_balance": true,
+          "package_royalty_vault_balance": true,
+          "non_fungible_include_nfids": true,
+          "explicit_metadata": [
+            "name",
+            "description"
+          ]
+        }
+      }`;
+    break;   
+    // Add more cases as needed
+    default:
+      throw new Error(`Unsupported method: ${method}`);
+  }
+  return code;
+}
+
+// ************ Utility Function (Gateway) *****************
+function getReward(data: { details: { state: { fields: any[]; }; }; }) {
+  const rewardField = data.details.state.fields.find((field: { field_name: string; }) => field.field_name === "reward");
+  return rewardField ? rewardField.value : null;
+}
+
+function getExtraReward(data: { details: { state: { fields: any[]; }; }; }) {
+  const rewardField = data.details.state.fields.find((field: { field_name: string; }) => field.field_name === "extra_reward");
+  return rewardField ? rewardField.value : null;
+}

@@ -66,6 +66,7 @@ echo '>>> Extend Lending Pool High'
 export amount='5000'
 resim run rtm/extend_lending_pool.rtm
 
+export fund='1000'
 echo '>>> Fund Main Vault'
 resim run rtm/fund.rtm
 
@@ -164,6 +165,7 @@ resim set-current-epoch 9500
 resim run rtm/redeem_from_pt.rtm
 
 export amount='3900'
+export amount='3800'
 echo '>>> redeem_from_pt, trying again (After Maturity 3) (amount '$amount') of type ' $resource_address
 resim set-current-epoch 9500
 resim run rtm/redeem_from_pt.rtm

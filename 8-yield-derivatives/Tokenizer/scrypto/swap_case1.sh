@@ -77,6 +77,7 @@ resim run rtm/extend_lending_pool.rtm
 # export token=$demo2
 # resim run rtm/add_token.rtm
 
+# export fund='1000'
 # echo '>>> Fund Main Vault'
 # resim run rtm/fund.rtm
 

@@ -1,6 +1,6 @@
 import { RadixDappToolkit, DataRequestBuilder, RadixNetwork, NonFungibleIdType, OneTimeDataRequestBuilder } from '@radixdlt/radix-dapp-toolkit'
 import { rdt } from './gateway.ts'; 
-import { getTokenAddress } from './gateway.ts';
+import { getTokenAddress, fetchComponentConfig } from './gateway.ts';
 
 const environment = process.env.NODE_ENV || 'Stokenet'; // Default to 'development' if NODE_ENV is not set
 console.log("environment (index.js): ", environment)
@@ -35,7 +35,8 @@ let pt_Address = import.meta.env.VITE_PT_RESOURCE_ADDRESS // PT token resource a
  * handleTransactionSuccess({ status: 'success', data: ... });
  */
 function handleTransactionSuccess(result) {
-
+  //get config parameter of the component
+  fetchComponentConfig(componentAddress);
 }
 
 /**

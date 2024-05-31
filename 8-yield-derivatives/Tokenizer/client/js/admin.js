@@ -36,7 +36,7 @@ let admin_badge = import.meta.env.VITE_ADMIN_BADGE
 let owner_badge = import.meta.env.VITE_OWNER_BADGE
 let lnd_resourceAddress = import.meta.env.VITE_USERDATA_NFT_RESOURCE_ADDRESS // NFT  manager
 let lnd_tokenAddress = import.meta.env.VITE_TOKENIZER_TOKEN_ADDRESS // TKN token resource address
-let staff_badge = import.meta.env.VITE_YT_RESOURCE_ADDRESS
+let staff_badge = import.meta.env.VITE_STAFF_BADGE
 
 let xrdAddress = import.meta.env.VITE_XRD //Stokenet XRD resource address
 
