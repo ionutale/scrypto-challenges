@@ -1,4 +1,4 @@
-use tokenizer::tokenizer::{test_bindings::*};
+use tokenizer::tokenizer::{test_bindings::*, UserMultiPosition};
 use scrypto::*;
 use scrypto_test::prelude::*;
 use scrypto::prelude::FungibleBucket;
@@ -27,25 +27,28 @@ fn tokenizer_supply_tokenize_multiple() -> Result<(), RuntimeError> {
     let bucket2 = ResourceBuilder::new_fungible(OwnerRole::None)
     .divisibility(18)
     .mint_initial_supply(100, &mut env)?;
-    let token1 = bucket2.resource_address(&mut env)?;
+    let token2 = bucket2.resource_address(&mut env)?;
+        
 
     // Create a bucket of XRD
+    // Create a bucket of XRD and Token2
     let initial_fund = BucketFactory::create_fungible_bucket(XRD,1000.into(),Mock,&mut env)?;
+    let initial_fund2 = BucketFactory::create_fungible_bucket(token2,1000.into(),Mock,&mut env)?;
 
     let reward = Decimal::from(5);
     let symbol = String::from("TKN");
     let reward_type = "timebased";
     // Instantiate the component
     let (mut tokenizerdapp, _admin_badge, _staff_badge) = Tokenizer::instantiate(
-        reward,symbol,  reward_type.to_string(), XRD, token1, package_address, &mut env,)?;
+        reward,symbol,  reward_type.to_string(), XRD, token2, package_address, &mut env,)?;
 
     // Fund main pool
     let _unused = env.with_auth_module_disabled(|env| {
         /* Auth Module is disabled just before this point */
         let _ = tokenizerdapp.fund_main_pool(scrypto::prelude::FungibleBucket(initial_fund), env);
+        let _ = tokenizerdapp.fund_main_pool(scrypto::prelude::FungibleBucket(initial_fund2), env);
         /* Kernel modules are reset just after this point. */
     });
-
     // //Create another account
     // let account = env
     // .call_function_typed::<_, AccountCreateAdvancedOutput>(
@@ -81,7 +84,53 @@ fn tokenizer_supply_tokenize_multiple() -> Result<(), RuntimeError> {
     assert_eq!(userdata_nft.0.amount(&mut env)?, dec!("1"));
     assert_eq!(tokenized_bucket.0.amount(&mut env)?, amount);
 
-    env.set_current_epoch(Epoch::of(1100));
+
+    env.set_current_epoch(Epoch::of(10100));
+    // Act
+    let (liquid_bucket, userdata_nft) = tokenizerdapp.redeem_from_pt(tokenized_bucket, userdata_nft, XRD,&mut env)?;
+    assert_eq!(userdata_nft.0.amount(&mut env)?, dec!("1"));
+    assert_eq!(liquid_bucket.amount(&mut env)?, amount);
+    println!("liquid_bucket from reedem: {:?} ", liquid_bucket.amount(&mut env)?);  
+
+    // Act
+    let (liquid_bucket, userdata_nft) = tokenizerdapp.claim_yield(userdata_nft, XRD,&mut env)?;
+    println!("liquid_bucket from claim: {:?} ", liquid_bucket.amount(&mut env)?);  
+    assert_eq!(userdata_nft.0.amount(&mut env)?, dec!("1"));
+    assert_eq!(liquid_bucket.amount(&mut env)?, dec!(0.95583));
+    
+
+    //supply and tokenize with the second token 
+    // Supply
+    let loan = scrypto::prelude::FungibleBucket(bucket2);
+    println!("Ready to supply again ");  
+    let (liquid_bucket2, userdata_nft) = tokenizerdapp.supply(loan, userdata_nft, token2, &mut env)?;
+    
+    // Tokenize
+    println!("Ready to tokenize again ");  
+    let (_tokenized_bucket2, userdata_nft) = tokenizerdapp.tokenize_yield(liquid_bucket2, dec!(10000), userdata_nft, token2,&mut env)?;
+    
+    println!("Ready to display Nft ");  
+    // let nft_data: UserMultiPosition = userdata_nft.as_non_fungible().into();   
+
+    let non_fung_bucket = resource::ScryptoBucket::as_non_fungible(&userdata_nft);
+    println!("Quite ready to display Nft ");  
+    let nft_data = resource::ScryptoNonFungibleBucket::non_fungible::<UserMultiPosition>(&non_fung_bucket).data();
+    println!("Finally to display Nft ");  
+
+    // let yield_data: HashMap<ResourceAddress, YieldTokenData> = nft_data.yield_token_data;
+    // let liquidity_data: HashMap<ResourceAddress, LiquidityData> = nft_data.liquidity_position;
+
+    // println!("Why not ?? ");  
+    // for (k, v) in liquidity_data {
+    //     println!("resourceAddress {:?}: Liquidity Data {:?}", k, v);
+    // }
+
+    // for (k, v) in yield_data {
+    //     println!("resourceAddress {:?}: Yield Data {:?}", k, v);
+    // }
+    nft_data.log_contents();
+    // let mut yield_data = nft_data.yield_token_data;
+    // log_user_position(&nft_data);
 
     Ok(())
 }    
@@ -398,7 +447,7 @@ fn tokenizer_supply_and_tokenize_success_test() -> Result<(), RuntimeError> {
 
     // Verify that the NFT's amount matches the expected amount
     assert_eq!(user_nft.0.amount(&mut env)?, dec!("1"));
-    println!("Nft: {:?} ", user_nft);  
+    println!("Nft: {:?} ", user_nft);   
 
     // Act
     let (liquid_bucket, nft_bucket) = tokenizerdapp.supply(bucket1, user_nft, XRD, &mut env)?;

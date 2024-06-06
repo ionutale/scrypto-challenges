@@ -100,13 +100,13 @@ use crate::utils::*;
 #[derive(ScryptoSbor, NonFungibleData)]
 pub struct UserMultiPosition {
     #[mutable]
-    liquidity_position: HashMap<ResourceAddress, LiquidityData>,
+    pub liquidity_position: HashMap<ResourceAddress, LiquidityData>,
     #[mutable]
-    yield_token_data: HashMap<ResourceAddress, YieldTokenData>
+    pub yield_token_data: HashMap<ResourceAddress, YieldTokenData>
 }
 
 /// this is to contain data about account's provided liquidity 
-#[derive(Copy, Clone, ScryptoSbor, NonFungibleData)]
+#[derive(Copy, Clone, ScryptoSbor, NonFungibleData, Debug)]
  pub struct LiquidityData {
     #[mutable]
     start_supply_epoch: Epoch,
@@ -117,7 +117,7 @@ pub struct UserMultiPosition {
 }
 
 /// this is to contain data about account's tokenized liquidity 
-#[derive(Copy, Clone, ScryptoSbor, NonFungibleData)]
+#[derive(Copy, Clone, ScryptoSbor, NonFungibleData, Debug)]
 pub struct YieldTokenData {
     extra_reward: Decimal,
     underlying_amount: Decimal,
@@ -125,6 +125,31 @@ pub struct YieldTokenData {
     pub yield_claimed: Decimal,
     maturity_date: Decimal,
     principal_returned: bool,
+}
+
+//Used to define methods for UserMultiPosition
+impl UserMultiPosition {
+    pub fn log_contents(&self) {
+        info!("Logging UserMultiPosition contents:");
+
+        if self.liquidity_position.is_empty() {
+            warn!("Liquidity position hashmap is empty.");
+        } else {
+            info!("Liquidity position:");
+            for (key, value) in &self.liquidity_position {
+                info!("ResourceAddress: {:?}, LiquidityData: {:?}", key, value);
+            }
+        }
+
+        if self.yield_token_data.is_empty() {
+            warn!("Yield token data hashmap is empty.");
+        } else {
+            info!("Yield token data:");
+            for (key, value) in &self.yield_token_data {
+                info!("ResourceAddress: {:?}, YieldTokenData: {:?}", key, value);
+            }
+        }
+    }
 }
 
 /// this is to contain the username of a Staff Member
@@ -420,9 +445,9 @@ mod tokenizer {
                 .metadata(metadata!(
                     init {
                         "name" => "Tokenizer", locked;
-                        "icon_url" => Url::of("https://test.Tokenizer.eu/images/logo3b.jpg"), locked;
+                        "icon_url" => Url::of("https://zerocollateral.eu/images/logo3b.jpg"), locked;
                         "description" => "Tokenizer SmartContract for lending and tokenizer service", locked;
-                        "claimed_websites" =>  ["https://test.Tokenizer.eu"], locked;
+                        "claimed_websites" =>  ["https://zerocollateral.eu"], locked;
                     }
                 ))
                 //Herein we are specifying what does a role need to present a proof of itself

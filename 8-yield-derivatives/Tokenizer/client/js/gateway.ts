@@ -47,10 +47,17 @@ export function getTokenAddress(currency) {
     if (currency === 'XRD') {
         return 'resource_tdx_2_1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxtfd2jc';
     } else if (currency === 'USDC') {
-        return 'resource_tdx_2_1t57ejuayfdyrzn6wvzdw0u9lh5ae3u72c4pcxwmvvuf47q6jzk4xv2';
-    } else if (currency === 'USDT') {
-      return 'resource_tdx_2_1th5z7tgaddluc8xg525rvy6klztvmth2tj4hgjpvd78x0mg5854ccu';
-  }
+        return 'resource_tdx_2_1t5e5q2jsn9eqe5ma0gqtpfjzqcmchjze28rfyttzunu3pr6y6t06t7';
+    } else if (currency === 'HUG') {
+      return 'resource_tdx_2_1tkna28k99gnj24ngqxvrcl7dh7lrqyr85496guk2zgprjhg8nkvs5h';
+    }  else if (currency === 'xWBTC') {
+      return 'resource_tdx_2_1t48fsfmh9kdfhdvge8x5dxee7u38wqcrjwesghjlks8lzmst725ccg';
+    }  else if (currency === 'xETH') {
+      return 'resource_tdx_2_1tkjmydgvva5rl8x0lt9vn5lzpz2xh2d23klzjhv884hm9gg770l720';
+    }
+
+    
+  
     // Return a default value or handle other cases as needed
     return '';
 }
