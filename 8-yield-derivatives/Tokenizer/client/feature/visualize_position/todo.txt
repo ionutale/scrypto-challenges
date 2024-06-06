@@ -1,0 +1,27 @@
+
+
+
+La sezione Position serve per visualizzare i dati presenti nell'NFT dell'account
+
+Nell'NFT ci sono due mappe, una relativa alle posizioni di liquidità e l'altra relativa alla liquidità bloccata.
+
+LIQUIDITY_POSITION - Complex Data Type (Map)
+
+YIELD_TOKEN_DATA - Complex Data Type (Map)
+
+Le mappe contengono un oggetto (composto da più field) per ogni tipo di token.
+
+Ad esempio se l'account ha fornito liquidità su token XRD allora nella Liquidity_position sarà contenuto un oggetto 
+con i campi valorizzati (start_supply_epoch, end_supply_epoch, amount)
+
+Se invece l'account ha bloccato la liquidità sempre su token XRD allora nella YIELD_TOKEN_DATA sarà contenuto un oggetto 
+con i campi valorizzati (extra_reward, underlying_amount, interest_totals, yield_claimed, maturity_date, principal_returned)
+
+Questi field sono da visualizzare all'interno della nuova sezione.
+
+Le necessarie interrogazioni delle API del Radix Gateway sono già state predisposte.
+
+L'intervento si deve realizzare all'incirca dalla riga 
+
+console.info('UserPosition complete data:', JSON.stringify(data, null, 2));
+

@@ -16,7 +16,8 @@ if (environment == 'production') {
 }
 gwUrl = import.meta.env.VITE_GATEWAY_URL;
 dashboardUrl = import.meta.env.VITE_DASHBOARD_URL;
-let component = import.meta.env.VITE_COMP_ADDRESS
+let component = import.meta.env.VITE_COMP_ADDRESS;
+let userdata_nft = import.meta.env.VITE_USERDATA_NFT_RESOURCE_ADDRESS;
 console.log("gw url (gateway.js): ", gwUrl)
 console.log("dashboard url (gateway.js): ", dashboardUrl)
 console.log("component address (gateway.js): ", component)
@@ -80,14 +81,19 @@ const subscription = rdt.walletApi.walletData$.subscribe((walletData) => {
 
     // Store the accountAddress in localStorage
     localStorage.setItem('accountAddress', accountAddress);
+
+
+    interface Hashmap {
+      [key: string]: any;
+    }    
+    const hashmap: Hashmap = fetchComponentConfig(componentAddress)  
+    //get config parameter of the component
+    console.log("Hashmap:", hashmap);  
+  
+    //fetch nft metadata info of the connected user
+    fetchUserPosition(accountAddress);
   }
 
-  interface Hashmap {
-    [key: string]: any;
-  }    
-  const hashmap: Hashmap = fetchComponentConfig(componentAddress)  
-  //get config parameter of the component
-  console.log("Hashmap:", hashmap);  
 
 })
 
@@ -136,7 +142,7 @@ export async function fetchComponentConfig(_componentAddress: any): Promise<Hash
 // ************ Utility Function (Gateway) *****************
 function generatePayload(method: string, _address: string, resource_address: string) {
   let code;
-  console.log("generatePayload for method:", method);
+  //console.log("generatePayload for method:", method);
   switch (method) {
     case 'ComponentConfig':
       console.log("generatePayload for method:", method);
@@ -157,6 +163,25 @@ function generatePayload(method: string, _address: string, resource_address: str
         }
       }`;
     break;   
+    case 'UserPosition':
+      console.log("generatePayload for method:", method);
+      code = `{
+        "addresses": [
+          "${accountAddress}"
+        ],
+        "aggregation_level": "Vault",
+        "opt_ins": {
+          "ancestor_identities": true,
+          "component_royalty_vault_balance": true,
+          "package_royalty_vault_balance": true,
+          "non_fungible_include_nfids": true,
+          "explicit_metadata": [
+            "name",
+            "description"
+          ]
+        }
+      }`;
+    break;       
     // Add more cases as needed
     default:
       throw new Error(`Unsupported method: ${method}`);
@@ -173,4 +198,155 @@ function getReward(data: { details: { state: { fields: any[]; }; }; }) {
 function getExtraReward(data: { details: { state: { fields: any[]; }; }; }) {
   const rewardField = data.details.state.fields.find((field: { field_name: string; }) => field.field_name === "extra_reward");
   return rewardField ? rewardField.value : null;
+}
+
+
+
+
+
+// *********** Fetch User NFT Metadata Information (/entity/details) (Gateway) ***********
+export async function fetchUserPosition(_accountAddress: string) {
+  // Define the data to be sent in the POST request.
+  const requestData = generatePayload("UserPosition", "", "Vault");
+  console.log("requestDat for entity/details:", requestData);
+
+  // Make an HTTP POST request to the gateway
+  fetch(gwUrl+'/state/entity/details', {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json',
+      },
+      body: requestData,
+  })
+  .then(response => response.json()) // Assuming the response is JSON data.
+  .then(data => { 
+      const resourceAddress = `${userdata_nft}`;
+      const result = getVaultsByResourceAddress(data, resourceAddress);
+      console.log(" NFT id " + JSON.stringify(result));
+      //TODO controllare la presenza di items
+      const itemsArray = result && result.length>0 ? result[0].items : null
+      console.log(" itemsArray " + itemsArray);
+      // Loop through itemsArray and make GET requests for each item
+      itemsArray?.forEach(async (item: any) => {
+        await fetchNftMetadata(resourceAddress, item);
+      });
+  })
+  .catch(error => {
+      console.error('Error fetching data:', error);
+  });
+}
+
+
+
+// *********** Fetch User NFT Metadata Information (Filtering response) (Gateway Utility) ***********
+function getVaultsByResourceAddress(jsonData: { items: never[]; }, resourceAddress: string) {
+  const items = jsonData.items || [];
+  // Filter items based on the resource_address
+  const filteredItems = items.filter((item: { non_fungible_resources: { items: any[]; }; }) => {
+    return (
+      item.non_fungible_resources &&
+      item.non_fungible_resources.items &&
+      item.non_fungible_resources.items.length > 0 &&
+      item.non_fungible_resources.items.some(
+        (        resource: { resource_address: any; }) =>
+          resource.resource_address &&
+          resource.resource_address === resourceAddress
+      )
+    );
+  });
+
+  // Extract vaults from the filtered items
+  const vaults = filteredItems.reduce((result: any[], item: { non_fungible_resources: { items: any[]; }; }) => {
+    if (
+      item.non_fungible_resources &&
+      item.non_fungible_resources.items &&
+      item.non_fungible_resources.items.length > 0
+    ) {
+      const matchingResources = item.non_fungible_resources.items.filter(
+        (        resource: { resource_address: any; }) =>
+          resource.resource_address &&
+          resource.resource_address === resourceAddress
+      );
+      
+      matchingResources.forEach((resource: { vaults: { total_count: number; items: any; }; }) => {
+        if (resource.vaults && resource.vaults.total_count > 0) {
+          result.push(...resource.vaults.items);
+        }
+      });
+    }
+    return result;
+  }, []);
+
+  return vaults;
+}
+
+
+
+
+
+// *********** Fetch User NFT Metadata Information (/non-fungible/data) (Gateway Utility) ***********
+async function fetchNftMetadata(resourceAddress: string, item: any) {
+  // Define the data to be sent in the GET request.
+  const requestData = `{
+    "resource_address": "${resourceAddress}",
+    "non_fungible_ids": [
+      "${item}"
+    ]
+  }`;
+
+  // Make an HTTP POST request to the gateway
+  fetch(gwUrl+'/state/non-fungible/data', {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json',
+      },
+      body: requestData,
+  })
+  .then(response => response.json()) 
+  .then(data => { 
+    console.info('UserPosition complete data:', JSON.stringify(data, null, 2));
+    // Extracting values from the nested structure
+    const extractedValues: { field_name: any; value: any; }[] = [];
+
+    // data.non_fungible_ids.forEach((id: { data: { programmatic_json: { fields: any[]; }; }; }) => {
+    //   id.data.programmatic_json.fields.forEach((field: { field_name: any; value: any; }) => {
+    //     const { field_name, value } = field;
+    //     extractedValues.push({ field_name, value });
+    //   });
+    // });
+
+    data.non_fungible_ids.forEach((id: { data: { programmatic_json: { fields: any[]; }; }; }) => {
+      id.data.programmatic_json.fields.forEach((field: { field_name: any; value: any; }) => {
+        const { field_name, value } = field;
+        console.info('UserPosition checking :', field_name, value );
+          // If it's not a tuple, just push the field as is
+          extractedValues.push({ field_name, value });
+      });
+    });
+    console.info('UserPosition what does it contains:', extractedValues);
+
+    data.non_fungible_ids.forEach((id: { data: { programmatic_json: { fields: any[]; }; }; }) => {
+      id.data.programmatic_json.fields.forEach((field: { field_name: any; fields: any; }) => {
+
+        const { field_name, fields } = field;
+        // Check if the value is an object (indicating it's a tuple)
+        if (Array.isArray(fields)) {
+          console.info('UserPosition2 its a tuple:', fields);
+          // If it's a tuple, iterate through its elements and push each one to the extractedValues array
+          fields.forEach((tupleElement: any, index: number) => {
+            const tupleFieldName = `${field_name}_${index + 1}`; // Creating a unique field name for each element of the tuple
+            extractedValues.push({ field_name: tupleElement.field_name, value: tupleElement.value });
+          });
+        } 
+      });
+    });
+    console.info('UserPosition2 what does it contains:', extractedValues);
+
+    // Find the elements by their IDs
+
+    
+  })
+  .catch(error => {
+      console.error('Error fetching data:', error);
+  });
 }
