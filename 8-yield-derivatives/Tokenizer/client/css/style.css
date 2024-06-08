@@ -23,7 +23,7 @@ body {
   background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
   background-size: 400% 400%;
   animation: gradient 30s ease infinite;
-  height: 100vh;
+  height: 100%;
 }
 
 @keyframes gradient {
@@ -123,6 +123,8 @@ button:active {
   border-color: var(--pacific-cyan); /* Change the border color on focus */
 }
 
+
+
 .header-container {
   display: flex;
   align-items: center;
@@ -182,6 +184,22 @@ section {
   padding: 0.5rem;
 }
 
+.maturity-date input[type="datetime-local"] {
+  /* style for ios safari */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+  padding: 0.5rem;
+  margin-top: 0.25rem;
+
+  width: 66%;
+  display: inline;
+  height: 100%;
+}
+
 #numberOfTokenizedZero,
 #tokenizeEndEpochBorrow
  {
@@ -195,6 +213,12 @@ section {
   max-width: 300px;
 }
 
+select#currencySelect {
+  border: 1px solid rgba(0, 0, 0, 0.1); /* Add a border to the input */
+  border-radius: 5px; /* Optional: Add border-radius for rounded corners */
+  padding: 0.5rem; /* Optional: Add padding for spacing inside the input */
+  margin-top: 0.25rem;
+}
 
 .row-wrapper {
   display: flex;
@@ -247,6 +271,60 @@ h1 {
 li a {
   text-overflow: ellipsis;
 }
+
+/* curency fieldset */
+fieldset {
+  border: none; /* Add a border to the fieldset */
+  border-radius: 5px; /* Optional: Add border-radius for rounded corners */
+  padding: 0.5rem; /* Optional: Add padding for spacing inside the fieldset */
+  margin-top: 0.25rem;
+}
+
+fieldset.currency {
+  display: flex;
+  flex-direction: row;  
+
+  /* level up */
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+  box-shadow: 0 1px 4px 0 rgba(0,0,0,0.2);
+
+  flex-basis: 48%;
+  justify-content: center;
+}
+
+fieldset legend {
+  text-align: center;
+}
+
+fieldset.currency label img {
+  padding: 0.5rem;
+}
+
+/* HIDE RADIO */
+[type=radio] { 
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* IMAGE STYLES */
+[type=radio] + img {
+  cursor: pointer;
+}
+
+/* CHECKED STYLES */
+[type=radio]:checked + img {
+  /* add shadow that looks like button is pushed inside */
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+
+}
+/* currentcy end */
 
 @media only screen and (max-width: 768px) {
   section {

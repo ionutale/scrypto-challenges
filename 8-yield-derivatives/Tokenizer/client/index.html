@@ -102,19 +102,23 @@
     </section>
 
     <section>
-      <div class="content-wrapper">
-        <div class="row-wrapper">
-          <div class="column center">
-            <h3>Choose the token you prefer to supply and tokenize !</h3>
-            <select id="currencySelect">
-              <option value="XRD">XRD</option>
-              <option value="USDC">USDC</option>
-              <option value="USDT">USDT</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      </div>
+      <fieldset class="currency">
+        <legend>
+          Choose the token you prefer to supply and tokenize !
+        </legend>
+        <label>
+          <input type="radio" id="XRD" name="currency" value="XRD" checked>
+          <img src="images/xrd.svg" alt="XRD" width="50" height="50" />
+        </label>
+        <label>
+          <input type="radio" id="USDC" name="currency" value="USDC">
+          <img src="images/usdc.svg" alt="USDC" width="50" height="50" />
+        </label>
+        <label>
+          <input type="radio" id="USDT" name="currency" value="USDT">
+          <img src="images/usdt.svg" alt="USDT" width="50" height="50" />
+        </label>
+      </fieldset>
     </section>
 
     <section>
